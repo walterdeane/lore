@@ -8,6 +8,11 @@
 <body>
 <div layout:fragment="content">
 
+    <nav th:replace="~{fragments/collection-nav :: nav(${collectionId})}"></nav>
+
+    <p th:if="${message}" class="flash flash-success" th:text="${message}">Success message</p>
+    <p th:if="${error}" class="flash flash-error" th:text="${error}">Error message</p>
+
     <h1>Tags</h1>
     <p class="text-dim">Hierarchical tags for this collection.</p>
 

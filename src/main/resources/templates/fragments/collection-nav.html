@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="nav(collectionId)" class="collection-nav">
+    <a th:href="@{/collections/{id}/tags(id=${collectionId})}">Tags</a>
+    <!-- Documents view not built yet: th:href="@{/collections/{id}/documents(id=${collectionId})}" -->
+</nav>
+</body>
+</html>

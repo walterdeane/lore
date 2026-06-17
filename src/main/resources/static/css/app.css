@@ -165,6 +165,45 @@ h1, h2, h3 {
     color: var(--text-dim);
 }
 
+.flash {
+    padding: 0.65rem 1rem;
+    border-radius: var(--radius);
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.flash-success {
+    background: rgba(124, 158, 255, 0.12);
+    border: 1px solid var(--accent-dim);
+    color: var(--accent);
+}
+
+.flash-error {
+    background: rgba(255, 99, 99, 0.1);
+    border: 1px solid #6b3232;
+    color: #ff8a8a;
+}
+
+.collection-nav {
+    display: flex;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.collection-nav a {
+    color: var(--text-dim);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.collection-nav a:hover {
+    color: var(--text);
+}
+
 .tag-form {
     display: flex;
     flex-wrap: wrap;

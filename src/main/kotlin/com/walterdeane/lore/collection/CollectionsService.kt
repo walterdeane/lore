@@ -22,13 +22,11 @@ class CollectionsService {
         return null
     }
 
-    fun updateCollectionById(id: UUID, collection: LoreCollection): Boolean {
+    fun updateCollectionById(id: UUID, collection: LoreCollection) {
         // Placeholder for actual collection update logic
-        return false
     }
 
-    fun deleteCollectionById(id: UUID): Boolean {
+    fun deleteCollectionById(id: UUID) {
         // Placeholder for actual collection deletion logic
-        return false
     }
 }

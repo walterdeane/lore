@@ -13,10 +13,11 @@ import org.springframework.web.multipart.MultipartFile
 import org.springframework.http.ResponseEntity
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE
+import org.springframework.stereotype.Controller
 import com.walterdeane.lore.model.Document
 import java.util.UUID
 
-@RestController
+@Controller
 class DocumentsController {
 
 @PostMapping("/documents", consumes = [MULTIPART_FORM_DATA_VALUE])

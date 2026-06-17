@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.servlet.mvc.support.RedirectAttributes
 
 @Controller()
 class TagsViewController(val tagsService: TagsService) {
@@ -22,8 +23,9 @@ class TagsViewController(val tagsService: TagsService) {
     }
 
     @PostMapping("/collections/{id}/tags")
-    fun createTag(@PathVariable id: UUID, @ModelAttribute tag: TagForm): String {
+    fun createTag(@PathVariable id: UUID, @ModelAttribute tag: TagForm, redirectAttributes: RedirectAttributes): String {
         tagsService.createTag(id, tag)
+        redirectAttributes.addFlashAttribute("message", "Tag created successfully")
         return "redirect:/collections/$id/tags"
     }
 
@@ -31,19 +33,22 @@ class TagsViewController(val tagsService: TagsService) {
     fun updateTag(
             @PathVariable id: UUID,
             @PathVariable tagId: UUID,
-            @ModelAttribute tag: TagForm
+            @ModelAttribute tag: TagForm,
+            redirectAttributes: RedirectAttributes
     ): String {
         tagsService.updateTag(id, tagId, tag)
+        redirectAttributes.addFlashAttribute("message", "Tag updated successfully")
         return "redirect:/collections/$id/tags" // Redirect back to tags page after update
     }
 
     @DeleteMapping("/collections/{id}/tags/{tagId}")
     fun deleteTag(
-            @PathVariable id: UUID, 
-            @PathVariable tagId: UUID
+            @PathVariable id: UUID,
+            @PathVariable tagId: UUID,
+            redirectAttributes: RedirectAttributes
         ): String {
-        // Placeholder for actual tag deletion logic
         tagsService.deleteTag(id, tagId)
+        redirectAttributes.addFlashAttribute("message", "Tag deleted successfully")
         return "redirect:/collections/$id/tags" // Redirect back to tags page after deletion
     }
 
