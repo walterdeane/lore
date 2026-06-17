@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: lore
+  mvc:
+    hiddenmethod:
+      filter:
+        enabled: true

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title layout:title-pattern="$CONTENT_TITLE - $LAYOUT_TITLE">Lore</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<div class="app-shell">
+    <header class="app-header">
+        <a class="brand" th:href="@{/}">
+            <span class="brand-mark">&#9670;</span>
+            <span class="brand-name">Lore</span>
+        </a>
+        <nav class="app-nav">
+            <a th:href="@{/collections}">Collections</a>
+            <a th:href="@{/documents}">Documents</a>
+            <a th:href="@{/tags}">Tags</a>
+            <a th:href="@{/query}" class="nav-cta">Ask</a>
+        </nav>
+    </header>
+
+    <main class="app-content" layout:fragment="content">
+        <!-- page content goes here -->
+    </main>
+
+    <footer class="app-footer">
+        <span>Lore &mdash; local knowledge, queried locally.</span>
+    </footer>
+</div>
+</body>
+</html>

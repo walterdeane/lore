@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Tags</title>
+</head>
+<body>
+<div layout:fragment="content">
+
+    <h1>Tags</h1>
+    <p class="text-dim">Hierarchical tags for this collection.</p>
+
+    <section class="card" style="margin-bottom: 1.5rem;">
+        <h2>Add a tag</h2>
+        <form th:action="@{/collections/{id}/tags(id=${collectionId})}" method="post" class="tag-form">
+            <input type="text" name="name" placeholder="Name" required>
+            <input type="text" name="description" placeholder="Description">
+            <input type="text" name="path" placeholder="e.g. cuisine.italian.northern" required>
+            <button type="submit" class="btn">Add tag</button>
+        </form>
+    </section>
+
+    <section class="card-grid">
+        <div class="card" th:each="tag : ${tags}">
+            <span class="tag-pill" th:text="${tag.path}">path</span>
+            <h3 th:text="${tag.name}">Tag name</h3>
+            <p class="text-dim" th:text="${tag.description}">Description</p>
+
+            <div class="tag-actions">
+                <a class="btn btn-secondary"
+                   th:href="@{/collections/{id}/tags/{tagId}/children(id=${collectionId}, tagId=${tag.id})}">
+                    View children
+                </a>
+
+                <form th:action="@{/collections/{id}/tags/{tagId}(id=${collectionId}, tagId=${tag.id})}"
+                      method="post" class="inline-form">
+                    <input type="hidden" name="_method" value="delete">
+                    <button type="submit" class="btn btn-secondary">Delete</button>
+                </form>
+            </div>
+
+            <details>
+                <summary>Edit</summary>
+                <form th:action="@{/collections/{id}/tags/{tagId}(id=${collectionId}, tagId=${tag.id})}"
+                      method="post" class="tag-form">
+                    <input type="hidden" name="_method" value="put">
+                    <input type="text" name="name" th:value="${tag.name}" required>
+                    <input type="text" name="description" th:value="${tag.description}">
+                    <input type="text" name="path" th:value="${tag.path}" required>
+                    <button type="submit" class="btn">Save</button>
+                </form>
+            </details>
+        </div>
+    </section>
+
+</div>
+</body>
+</html>

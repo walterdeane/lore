@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Child tags</title>
+</head>
+<body>
+<div layout:fragment="content">
+
+    <a th:href="@{/collections/{id}/tags(id=${collectionId})}" class="text-dim">&larr; Back to tags</a>
+
+    <h1>Child tags</h1>
+
+    <section class="card-grid">
+        <div class="card" th:each="tag : ${childTags}">
+            <span class="tag-pill" th:text="${tag.path}">path</span>
+            <h3 th:text="${tag.name}">Tag name</h3>
+            <p class="text-dim" th:text="${tag.description}">Description</p>
+        </div>
+    </section>
+
+    <p th:if="${childTags.isEmpty()}" class="text-dim">No child tags yet.</p>
+
+</div>
+</body>
+</html>
