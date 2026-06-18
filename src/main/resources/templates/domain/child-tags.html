@@ -8,9 +8,9 @@
 <body>
 <div layout:fragment="content">
 
-    <nav th:replace="~{fragments/collection-nav :: nav(${collectionId})}"></nav>
+    <nav th:replace="~{fragments/domain-nav :: nav(${domainId})}"></nav>
 
-    <a th:href="@{/collections/{id}/tags(id=${collectionId})}" class="text-dim">&larr; Back to tags</a>
+    <a th:href="@{/domains/{id}/tags(id=${domainId})}" class="text-dim">&larr; Back to tags</a>
 
     <h1>Child tags</h1>
 

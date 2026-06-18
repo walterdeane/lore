@@ -10,7 +10,4 @@ services:
     ports:
       - '5432'
     volumes:
-      - 'lore-pgdata:/var/lib/postgresql/data'
-
-volumes:
-  lore-pgdata:
+      - '${LORE_DATA_DIR:-${HOME}/lore-data}/pgdata:/var/lib/postgresql/data'

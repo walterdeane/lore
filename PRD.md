@@ -69,41 +69,41 @@ Embeddings: nomic-embed-text — negligible footprint
 
 Domain Model
 
-Collection
+Domain
   └── has many Documents
-  └── has many Tags (hierarchical, scoped to this Collection)
+  └── has many Tags (hierarchical, scoped to this Domain)
 
 Document
-  └── belongs to one Collection
+  └── belongs to one Domain
   └── has many Tags (via join table)
   └── has many Chunks
   └── has a local sourcePath (file reference, not operationally critical)
   └── tracks ingestion lifecycle
 
 Tag
-  └── belongs to a Collection
+  └── belongs to a Domain
   └── hierarchical via ltree materialised path (e.g. cuisine.italian.northern)
   └── optional parent
 
 Chunk
   └── belongs to a Document
-  └── denormalised collectionId (for filtered vector search)
+  └── denormalised domainId (for filtered vector search)
   └── denormalised tagPaths array (for filtered vector search)
   └── carries the embedding vector (pgvector)
 
-Collection
+Domain
 
 Top-level, first-class organiser. A named theme: Brewing, Cookbooks, Woodworking, Lutherie, Permaculture. Has name, description, slug.
 
 Tag
 
-Hierarchical within a Collection, using an ltree materialised path. This mirrors how I encode hierarchy in DynamoDB sort keys (CUISINE#ITALIAN#NORTHERN with begins_with) — same mental model. Use Postgres ltree with its @>, <@, ~ operators and a GiST index. Example hierarchy inside a Cookbooks collection: cuisine.italian, technique.fermentation, format.reference.
+Hierarchical within a Domain, using an ltree materialised path. This mirrors how I encode hierarchy in DynamoDB sort keys (CUISINE#ITALIAN#NORTHERN with begins_with) — same mental model. Use Postgres ltree with its @>, <@, ~ operators and a GiST index. Example hierarchy inside a Cookbooks Domain: cuisine.italian, technique.fermentation, format.reference.
 
 Document
 
 
 id (UUID), title, author (nullable), sourceFilename, sourcePath, sourceType (PDF first; design for EPUB/Markdown/web-clip later)
-collectionId
+domainId
 Ingestion lifecycle: ingestionStatus enum (PENDING → PROCESSING → COMPLETE / FAILED), ingestionError (nullable), ingestedAt (nullable)
 createdAt, updatedAt
 Original file stored on the local filesystem; the path is a reference. The app functions without the original after ingestion — it's kept for re-ingestion (new chunking/embedding config), source verification, and fidelity. Not operationally critical.
@@ -113,7 +113,7 @@ Chunk
 
 
 id (UUID), documentId
-collectionId (denormalised), tagPaths (denormalised text array)
+domainId (denormalised), tagPaths (denormalised text array)
 content (raw text), embedding (pgvector vector type)
 chunkIndex, pageNumber (nullable), tokenCount (nullable), createdAt
 Denormalisation is deliberate — filtered vector similarity searches run a WHERE on the Chunk row itself rather than joining through Document. Retrieval performance/accuracy over normalisation purity is the right tradeoff here.
@@ -122,19 +122,19 @@ Denormalisation is deliberate — filtered vector similarity searches run a WHER
 
 API Surface
 
-Collections & Tags
+Domains & Tags
 
-GET    /collections
-POST   /collections
-GET    /collections/{id}
-PUT    /collections/{id}
-DELETE /collections/{id}
+GET    /domains
+POST   /domains
+GET    /domains/{id}
+PUT    /domains/{id}
+DELETE /domains/{id}
 
-GET    /collections/{id}/tags
-POST   /collections/{id}/tags
-PUT    /collections/{id}/tags/{tagId}
-DELETE /collections/{id}/tags/{tagId}
-GET    /collections/{id}/tags/{tagId}/children
+GET    /domains/{id}/tags
+POST   /domains/{id}/tags
+PUT    /domains/{id}/tags/{tagId}
+DELETE /domains/{id}/tags/{tagId}
+GET    /domains/{id}/tags/{tagId}/children
 
 Documents (ingestion is async)
 
@@ -143,7 +143,7 @@ GET    /documents/{id}            # includes ingestionStatus
 GET    /documents/{id}/chunks     # inspect produced chunks (debugging)
 DELETE /documents/{id}            # removes document and all chunks
 POST   /documents/{id}/reingest   # reprocess with current config
-GET    /collections/{id}/documents
+GET    /domains/{id}/documents
 
 Query / RAG
 
@@ -154,7 +154,7 @@ Query request:
 
 json{
   "question": "what temperature should I ferment at?",
-  "collectionIds": ["uuid"],
+  "domainIds": ["uuid"],
   "tagPaths": ["technique.fermentation"],
   "limit": 5
 }
@@ -168,7 +168,7 @@ json{
       "chunkId": "uuid",
       "documentId": "uuid",
       "documentTitle": "The Complete Joy of Homebrewing",
-      "collectionName": "Brewing",
+      "domainName": "Brewing",
       "pageNumber": 47,
       "tagPaths": ["technique.fermentation"],
       "content": "...the raw chunk text...",
@@ -177,7 +177,7 @@ json{
   ],
   "query": {
     "question": "what temperature should I ferment at?",
-    "collectionIds": ["uuid"],
+    "domainIds": ["uuid"],
     "tagPaths": ["technique.fermentation"]
   }
 }
@@ -189,15 +189,15 @@ Suggested build order
 
 
 Docker Compose + Postgres with pgvector and ltree enabled; Flyway baseline migration
-Domain entities + JPA mappings + repositories (start with Collection, then Document, Tag, Chunk)
-Collection & Tag CRUD endpoints (get the ltree hierarchy queries working)
+Domain entities + JPA mappings + repositories (start with Domain, then Document, Tag, Chunk)
+Domain & Tag CRUD endpoints (get the ltree hierarchy queries working)
 Document upload + local file storage + Document record creation
 Ingestion pipeline (Spring AI ETL: read PDF → split/chunk → embed via Ollama → write to pgvector with denormalised metadata) running async, updating ingestionStatus
 /query/search retrieval-only endpoint (validate filtered vector search works before adding the LLM)
 /query full RAG with answer generation and source assembly
 
 
-Start narrow: one Collection, upload one PDF, get a single end-to-end query working. Then grow it.
+Start narrow: one Domain, upload one PDF, get a single end-to-end query working. Then grow it.
 
 
 Things to read before/while building

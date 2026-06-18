@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Domains</title>
+</head>
+<body>
+<div layout:fragment="content">
+
+    <nav th:replace="~{fragments/domain-nav :: nav(${domainId})}"></nav>
+
+    <p th:if="${message}" class="flash flash-success" th:text="${message}">Success message</p>
+    <p th:if="${error}" class="flash flash-error" th:text="${error}">Error message</p>
+
+    <h1>Domains</h1>
+    <p class="text-dim">top level Domains for knowledge management areas</p>
+    <button type="button" class="btn btn-secondary" onclick="document.getElementById('howItWorksModal').showModal()">How does this work?</button>
+
+    <dialog id="howItWorksModal" class="modal">
+        <form method="dialog" class="modal-content">
+            <div class="modal-header">
+                <h2>How does this work?</h2>
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('howItWorksModal').close()">Close</button>
+            </div>
+
+            <div class="modal-body">
+                <h2>Domains, Tags, and Documents</h2>
+                <ul>
+                    <li>Domain is the top-level organizer. It represents a named theme or knowledge bucket like Brewing, Cookbooks, or Permaculture.</li>
+                    <li>Document belongs to one domain and stores source metadata: title, author, filename/path, source type, and ingestion state. Documents are the units you ingest and later search over.</li>
+                    <li>Tag is a domain-scoped label hierarchy. Tags are scoped to a single domain and can be expressed as hierarchical paths like cuisine.italian or technique.fermentation.</li>
+                    <li>Documents are associated with tags, but tags are not global—they live within the domain’s namespace.</li>
+                </ul>
+                <h3>How they work together</h3>
+                <ul>
+                    <li>A domain groups documents by theme.</li>
+                    <li>A document is a source file inside that domain.</li>
+                    <li>Tags classify documents within the domain and enable filtered retrieval.</li>
+                    <li>During ingestion, each document is split into Chunks, and chunks carry denormalized metadata:</li>
+                    <ul>
+                        <li>domainId so filtered vector search can work without joins</li>
+                        <li>tagPaths so chunk retrieval can respect tag filters</li>
+                    </ul>
+                </ul>
+                <h3>Why this model</h3>
+                <ul>
+                    <li>the domain simple and scalable</li>
+                    <li>Supports filtered vector search by domain + tag paths</li>
+                    <li>Keeps domain and document metadata lightweight</li>
+                    <li>Allows the retrieval/query layer to build nested views only when needed</li>
+                </ul>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('howItWorksModal').close()">Close</button>
+            </div>
+        </form>
+    </dialog>
+
+    <section class="card" style="margin-bottom: 1.5rem;">
+        <h2>Add a Domain</h2>
+        <form th:action="@{/domains}" method="post" class="tag-form">
+            <input type="text" name="name" placeholder="Name" required>
+            <input type="text" name="description" placeholder="Description">
+            <button type="submit" class="btn">Add domain</button>
+        </form>
+    </section>
+
+    <form th:action="@{/domains}" method="get" class="tag-form" style="margin-bottom: 1.5rem;">
+        <input type="text" name="q" placeholder="Search tags" th:value="${query}">
+        <button type="submit" class="btn btn-secondary">Search</button>
+    </form>
+
+    <section class="card-grid">
+        <div class="card" th:each="domain : ${domainsPage.content}">
+            
+            <h3 th:text="${domain.name}">Domain name</h3>
+            <p class="text-dim" th:text="${domain.description}">Description</p>
+
+            <div class="domain-actions">
+                <a class="btn btn-secondary"
+                   th:href="@{/domains/{id}/tags(id=${domain.id})}">
+                    View tags
+                </a>
+
+                <form th:action="@{/domains/{id}(id=${domain.id})}"
+                      method="post" class="inline-form">
+                    <input type="hidden" name="_method" value="delete">
+                    <button type="submit" class="btn btn-secondary">Delete</button>
+                </form>
+            </div>
+
+            <details>
+                <summary>Edit</summary>
+                <form th:action="@{/domains/{id}(id=${domain.id})}"
+                      method="post" class="domain-form">
+                    <input type="hidden" name="_method" value="put">
+                    <input type="text" name="name" th:value="${domain.name}" required>
+                    <input type="text" name="description" th:value="${domain.description}">
+                    <button type="submit" class="btn">Save</button>
+                </form>
+            </details>
+        </div>
+    </section>
+
+    <p th:if="${domainsPage.content.isEmpty()}" class="text-dim">No domains found.</p>
+
+    <nav class="pager" th:if="${domainsPage.totalPages > 1}">
+        <a th:if="${domainsPage.hasPrevious()}"
+           th:href="@{/domains(page=${domainsPage.number - 1}, q=${query})}"
+           class="btn btn-secondary">&larr; Previous</a>
+        <span class="text-dim">Page <span th:text="${domainsPage.number + 1}">1</span> of <span th:text="${domainsPage.totalPages}">1</span></span>
+        <a th:if="${domainsPage.hasNext()}"
+           th:href="@{/domains(page=${domainsPage.number + 1}, q=${query})}"
+           class="btn btn-secondary">Next &rarr;</a>
+    </nav>
+
+</div>
+</body>
+</html>

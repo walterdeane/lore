@@ -23,7 +23,7 @@ class DocumentsController {
 @PostMapping("/documents", consumes = [MULTIPART_FORM_DATA_VALUE])
 fun uploadDocument(
     @RequestParam("file") file: MultipartFile,
-    @RequestParam("loreCollectionId") loreCollectionId: UUID,
+    @RequestParam("domainId") domainId: UUID,
     @RequestParam("title", required = false) title: String?,
     @RequestParam("author", required = false) author: String?,
 ): ResponseEntity<Void> {
@@ -49,7 +49,7 @@ fun getDocumentById(@PathVariable id: UUID): ResponseEntity<Document> {
         sourcePath = "/path/to/example.pdf",
         sourceType = com.walterdeane.lore.model.SourceType.PDF,
         tags = listOf("example", "test"),
-        loreCollectionId = UUID.randomUUID(),
+        domainId = UUID.randomUUID(),
         ingestionStatus = com.walterdeane.lore.model.IngestionStatus.COMPLETED,
         ingestionError = null,
         ingestedAt = java.time.Instant.now()
@@ -81,9 +81,9 @@ fun reingestDocument(@PathVariable id: UUID): ResponseEntity<Void> {
     return ResponseEntity.accepted().build()
 }
 
-@GetMapping("/collections/{collectionId}/documents")
-fun getDocumentsByCollectionId(@PathVariable collectionId: UUID): ResponseEntity<List<Document>> {
-    // Placeholder: retrieve documents by collection id
+@GetMapping("/domains/{domainId}/documents")
+fun getDocumentsByDomainId(@PathVariable domainId: UUID): ResponseEntity<List<Document>> {
+    // Placeholder: retrieve documents by domain id
     val documents = listOf(
         Document(
             id = UUID.randomUUID(),
@@ -93,7 +93,7 @@ fun getDocumentsByCollectionId(@PathVariable collectionId: UUID): ResponseEntity
             sourcePath = "/path/to/example1.pdf",
             sourceType = com.walterdeane.lore.model.SourceType.PDF,
             tags = listOf("example", "test"),
-            loreCollectionId = collectionId,
+            domainId = domainId,
             ingestionStatus = com.walterdeane.lore.model.IngestionStatus.COMPLETED,
             ingestionError = null,
             ingestedAt = java.time.Instant.now()
@@ -106,7 +106,7 @@ fun getDocumentsByCollectionId(@PathVariable collectionId: UUID): ResponseEntity
             sourcePath = "/path/to/example2.epub",
             sourceType = com.walterdeane.lore.model.SourceType.EPUB,
             tags = listOf("example", "test"),
-            loreCollectionId = collectionId,
+            domainId = domainId,
             ingestionStatus = com.walterdeane.lore.model.IngestionStatus.COMPLETED,
             ingestionError = null,
             ingestedAt = java.time.Instant.now()

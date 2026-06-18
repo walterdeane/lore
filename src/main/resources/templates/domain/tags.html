@@ -8,17 +8,17 @@
 <body>
 <div layout:fragment="content">
 
-    <nav th:replace="~{fragments/collection-nav :: nav(${collectionId})}"></nav>
+    <nav th:replace="~{fragments/domain-nav :: nav(${domainId})}"></nav>
 
     <p th:if="${message}" class="flash flash-success" th:text="${message}">Success message</p>
     <p th:if="${error}" class="flash flash-error" th:text="${error}">Error message</p>
 
     <h1>Tags</h1>
-    <p class="text-dim">Hierarchical tags for this collection.</p>
+    <p class="text-dim">Hierarchical tags for this domain.</p>
 
     <section class="card" style="margin-bottom: 1.5rem;">
         <h2>Add a tag</h2>
-        <form th:action="@{/collections/{id}/tags(id=${collectionId})}" method="post" class="tag-form">
+        <form th:action="@{/domains/{id}/tags(id=${domainId})}" method="post" class="tag-form">
             <input type="text" name="name" placeholder="Name" required>
             <input type="text" name="description" placeholder="Description">
             <input type="text" name="path" placeholder="e.g. cuisine.italian.northern" required>
@@ -26,19 +26,24 @@
         </form>
     </section>
 
+    <form th:action="@{/domains/{id}/tags(id=${domainId})}" method="get" class="tag-form" style="margin-bottom: 1.5rem;">
+        <input type="text" name="q" placeholder="Search tags" th:value="${query}">
+        <button type="submit" class="btn btn-secondary">Search</button>
+    </form>
+
     <section class="card-grid">
-        <div class="card" th:each="tag : ${tags}">
+        <div class="card" th:each="tag : ${tagsPage.content}">
             <span class="tag-pill" th:text="${tag.path}">path</span>
             <h3 th:text="${tag.name}">Tag name</h3>
             <p class="text-dim" th:text="${tag.description}">Description</p>
 
             <div class="tag-actions">
                 <a class="btn btn-secondary"
-                   th:href="@{/collections/{id}/tags/{tagId}/children(id=${collectionId}, tagId=${tag.id})}">
+                   th:href="@{/domains/{id}/tags/{tagId}/children(id=${domainId}, tagId=${tag.id})}">
                     View children
                 </a>
 
-                <form th:action="@{/collections/{id}/tags/{tagId}(id=${collectionId}, tagId=${tag.id})}"
+                <form th:action="@{/domains/{id}/tags/{tagId}(id=${domainId}, tagId=${tag.id})}"
                       method="post" class="inline-form">
                     <input type="hidden" name="_method" value="delete">
                     <button type="submit" class="btn btn-secondary">Delete</button>
@@ -47,7 +52,7 @@
 
             <details>
                 <summary>Edit</summary>
-                <form th:action="@{/collections/{id}/tags/{tagId}(id=${collectionId}, tagId=${tag.id})}"
+                <form th:action="@{/domains/{id}/tags/{tagId}(id=${domainId}, tagId=${tag.id})}"
                       method="post" class="tag-form">
                     <input type="hidden" name="_method" value="put">
                     <input type="text" name="name" th:value="${tag.name}" required>
@@ -58,6 +63,18 @@
             </details>
         </div>
     </section>
+
+    <p th:if="${tagsPage.content.isEmpty()}" class="text-dim">No tags found.</p>
+
+    <nav class="pager" th:if="${tagsPage.totalPages > 1}">
+        <a th:if="${tagsPage.hasPrevious()}"
+           th:href="@{/domains/{id}/tags(id=${domainId}, page=${tagsPage.number - 1}, q=${query})}"
+           class="btn btn-secondary">&larr; Previous</a>
+        <span class="text-dim">Page <span th:text="${tagsPage.number + 1}">1</span> of <span th:text="${tagsPage.totalPages}">1</span></span>
+        <a th:if="${tagsPage.hasNext()}"
+           th:href="@{/domains/{id}/tags(id=${domainId}, page=${tagsPage.number + 1}, q=${query})}"
+           class="btn btn-secondary">Next &rarr;</a>
+    </nav>
 
 </div>
 </body>

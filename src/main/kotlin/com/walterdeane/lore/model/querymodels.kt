@@ -5,7 +5,7 @@ import java.util.UUID
 
 data class QueryRequest(
     val question: String,
-    val collectionIds: List<UUID>,
+    val domainIds: List<UUID>,
     val tagPaths: List<String>,
     val limit: Int,
    )
@@ -19,7 +19,7 @@ data class QueryResponse(
 data class SourceChunk(
     val chunkId: UUID,
     val documentTitle: String,
-    val collectionName: String,
+    val domainName: String,
     val pageNumber: Int?,
     val tagPaths: List<String>,
     val content: String,

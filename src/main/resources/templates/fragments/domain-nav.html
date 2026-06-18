@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<nav th:fragment="nav(domainId)" class="domain-nav">
+    <a th:href="@{/domains/{id}/tags(id=${domainId})}">Tags</a>
+    <!-- Documents view not built yet: th:href="@{/domains/{id}/documents(id=${domainId})}" -->
+</nav>
+</body>
+</html>

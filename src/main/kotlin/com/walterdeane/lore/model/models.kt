@@ -3,7 +3,7 @@ package com.walterdeane.lore.model
 import java.util.UUID
 import java.time.Instant
 
-data class LoreCollection(
+data class Domain(
     val id: UUID,
     val name: String,
     val description: String,
@@ -11,7 +11,7 @@ data class LoreCollection(
 
 data class Tag(
     val id: UUID,
-    val loreCollectionId: UUID,
+    val domainId: UUID,
     val name: String,
     val description: String,
     val path: String, //materialized path for hierarchical tags, e.g. "Science/Physics/Quantum Mechanics"
@@ -25,7 +25,7 @@ data class Document(
     val sourcePath: String,
     val sourceType: SourceType,
     val tags: List<String>,
-    val loreCollectionId: UUID,
+    val domainId: UUID,
     val ingestionStatus: IngestionStatus,
     val ingestionError: String?,
     val ingestedAt: Instant?
@@ -34,7 +34,7 @@ data class Document(
 data class Chunk(
     val id: UUID,
     val documentId: UUID,
-    val collectionId: UUID,
+    val domainId: UUID,
     val tagPaths: List<String>,
     val content: String,
     val embedding: List<Float>, //(pgvector `vector` type)

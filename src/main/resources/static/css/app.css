@@ -151,7 +151,7 @@ h1, h2, h3 {
     background: #232838;
 }
 
-.tag-pill {
+.tag-pill, .domain-pill {
     display: inline-block;
     background: var(--accent-dim);
     color: #c9d4ff;
@@ -163,6 +163,13 @@ h1, h2, h3 {
 
 .text-dim {
     color: var(--text-dim);
+}
+
+.pager {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
 }
 
 .flash {
@@ -185,7 +192,7 @@ h1, h2, h3 {
     color: #ff8a8a;
 }
 
-.collection-nav {
+.domain-nav {
     display: flex;
     gap: 1.25rem;
     margin-bottom: 1.5rem;
@@ -193,25 +200,25 @@ h1, h2, h3 {
     border-bottom: 1px solid var(--border);
 }
 
-.collection-nav a {
+.domain-nav a {
     color: var(--text-dim);
     text-decoration: none;
     font-weight: 500;
     font-size: 0.9rem;
 }
 
-.collection-nav a:hover {
+.domain-nav a:hover {
     color: var(--text);
 }
 
-.tag-form {
+.tag-form, .domain-form {
     display: flex;
     flex-wrap: wrap;
     gap: 0.6rem;
     margin-top: 0.75rem;
 }
 
-.tag-form input {
+.tag-form input, .domain-form input {
     flex: 1;
     min-width: 160px;
     background: var(--surface-raised);
@@ -222,12 +229,12 @@ h1, h2, h3 {
     font-size: 0.9rem;
 }
 
-.tag-form input:focus {
+.tag-form input:focus, .domain-form input:focus {
     outline: none;
     border-color: var(--accent);
 }
 
-.tag-actions {
+.tag-actions, .domain-actions {
     display: flex;
     gap: 0.5rem;
     margin-top: 1rem;
