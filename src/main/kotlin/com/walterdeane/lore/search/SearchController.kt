@@ -15,7 +15,8 @@ class SearchController(private val bm25SearchService: BM25SearchService) {
     fun bm25(
         @RequestParam q: String,
         @RequestParam domainId: UUID,
+        @RequestParam(required = false) tags: List<String>?,
         @RequestParam(defaultValue = "20") limit: Int,
     ): ResponseEntity<List<BM25SearchService.Result>> =
-        ResponseEntity.ok(bm25SearchService.search(q, domainId, limit))
+        ResponseEntity.ok(bm25SearchService.search(q, domainId, tags, limit))
 }

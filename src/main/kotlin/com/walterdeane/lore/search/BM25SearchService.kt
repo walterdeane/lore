@@ -19,7 +19,11 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
         val rank: Double,
     )
 
-    fun search(query: String, domainId: UUID, limit: Int = 20): List<Result> {
+    fun search(query: String, domainId: UUID, tags: List<String>? = null, limit: Int = 20): List<Result> {
+        val tagClause = if (!tags.isNullOrEmpty())
+            "AND c.tag_paths && ARRAY[${tags.joinToString(",") { "?" }}]::ltree[]"
+        else ""
+
         val sql = """
             SELECT c.id, c.document_id, c.domain_id, c.chunk_index, c.chunk_strategy, c.tag_paths,
                    ts_rank_cd(c.search_vector, q) AS rank,
@@ -27,9 +31,17 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
             FROM chunk c, plainto_tsquery('english', ?) q
             WHERE c.search_vector @@ q
               AND c.domain_id = ?
+              $tagClause
             ORDER BY rank DESC
             LIMIT ?
         """.trimIndent()
+
+        val args = buildList<Any?> {
+            add(query)
+            add(domainId)
+            if (!tags.isNullOrEmpty()) addAll(tags)
+            add(limit)
+        }.toTypedArray()
 
         return jdbcTemplate.query(sql, { rs, _ ->
             Result(
@@ -42,6 +54,6 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
                 headline = rs.getString("headline"),
                 rank = rs.getDouble("rank"),
             )
-        }, query, domainId, limit)
+        }, *args)
     }
 }
