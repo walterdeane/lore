@@ -63,6 +63,10 @@
         <form th:action="@{/domains}" method="post" class="tag-form">
             <input type="text" name="name" placeholder="Name" required>
             <input type="text" name="description" placeholder="Description">
+            <select name="chunkStrategy">
+                <option value="">Chunking strategy (default: TOKEN)</option>
+                <option th:each="s : ${strategies}" th:value="${s}" th:text="${s}"></option>
+            </select>
             <button type="submit" class="btn">Add domain</button>
         </form>
     </section>
@@ -84,6 +88,14 @@
                     <input type="hidden" name="_method" value="put">
                     <input type="text" name="name" th:value="${domain.name}" required>
                     <input type="text" name="description" th:value="${domain.description}">
+                    <select name="chunkStrategy">
+                        <option value="" th:selected="${domain.chunkStrategy == null}">Default (TOKEN)</option>
+                        <option th:each="s : ${strategies}"
+                                th:value="${s}"
+                                th:text="${s}"
+                                th:selected="${domain.chunkStrategy == s}">
+                        </option>
+                    </select>
                     <button type="submit" class="btn">Save</button>
                 </form>
             </details>

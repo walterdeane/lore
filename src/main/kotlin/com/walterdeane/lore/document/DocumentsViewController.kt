@@ -1,6 +1,7 @@
 package com.walterdeane.lore.document
 
 import com.walterdeane.lore.domain.DomainsService
+import com.walterdeane.lore.model.ChunkingStrategy
 import com.walterdeane.lore.tags.TagsService
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
@@ -36,6 +37,7 @@ class DocumentsViewController(
         model.addAttribute("query", q)
         model.addAttribute("documentsPage", documentsService.getDocuments(domainId, q, pageable))
         model.addAttribute("availableTags", tagsService.getDomainTags(domainId))
+        model.addAttribute("strategies", ChunkingStrategy.values())
         return "domain/documents"
     }
 
@@ -57,10 +59,12 @@ class DocumentsViewController(
         @RequestParam("title", required = false) title: String?,
         @RequestParam("author", required = false) author: String?,
         @RequestParam("tags", required = false) tags: List<String>?,
+        @RequestParam("chunkStrategy", required = false) chunkStrategy: String?,
         @RequestParam("file") file: MultipartFile,
     ): String {
+        val strategy = chunkStrategy?.takeIf { it.isNotBlank() }?.let { ChunkingStrategy.valueOf(it) }
         val document = documentsService.importDocument(
-            domainId, file.originalFilename ?: "untitled", file.bytes, title, author, tags ?: emptyList()
+            domainId, file.originalFilename ?: "untitled", file.bytes, title, author, tags ?: emptyList(), strategy
         )
         return "redirect:/domains/$domainId/documents/${document.id}"
     }

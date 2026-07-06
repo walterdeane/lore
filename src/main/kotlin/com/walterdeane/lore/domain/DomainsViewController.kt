@@ -8,8 +8,8 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.servlet.mvc.support.RedirectAttributes
 import org.springframework.stereotype.Controller
 import org.springframework.ui.Model
+import com.walterdeane.lore.model.ChunkingStrategy
 import com.walterdeane.lore.model.Domain
-import com.walterdeane.lore.model.Tag
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
@@ -31,27 +31,28 @@ private val tagsService: TagsService
     ): String {
         model.addAttribute("query", q)
         model.addAttribute("domainsPage", domainsService.getDomains(q, pageable))
+        model.addAttribute("strategies", ChunkingStrategy.values())
         return "domain/index"
     }
 
     @PostMapping("/domains")
     fun createDomain(@ModelAttribute domainForm: DomainForm): String {
-        val domain = Domain(
+        domainsService.createDomain(Domain(
             id = UUID.randomUUID(),
             name = domainForm.name,
-            description = domainForm.description
-        )
-        domainsService.createDomain(domain)
+            description = domainForm.description,
+            chunkStrategy = domainForm.chunkStrategy?.takeIf { it.isNotBlank() }?.let { ChunkingStrategy.valueOf(it) },
+        ))
         return "redirect:/domains"
     }
-
 
     @PutMapping("/domains/{id}")
     fun updateDomainById(@PathVariable id: UUID, @ModelAttribute domainForm: DomainForm, redirectAttributes: RedirectAttributes): String {
         domainsService.updateDomainById(Domain(
             id = id,
             name = domainForm.name,
-            description = domainForm.description
+            description = domainForm.description,
+            chunkStrategy = domainForm.chunkStrategy?.takeIf { it.isNotBlank() }?.let { ChunkingStrategy.valueOf(it) },
         ))
         redirectAttributes.addFlashAttribute("message", "Domain updated successfully")
         return "redirect:/domains"
@@ -67,5 +68,6 @@ private val tagsService: TagsService
 
 data class DomainForm(
     val name: String,
-    val description: String
+    val description: String,
+    val chunkStrategy: String? = null,
 )

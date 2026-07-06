@@ -25,6 +25,10 @@
                                 th:text="${tag.path}">
                         </option>
                     </select>
+            <select name="chunkStrategy">
+                <option value="">Chunking strategy (inherit from domain)</option>
+                <option th:each="s : ${strategies}" th:value="${s}" th:text="${s}"></option>
+            </select>
             <input type="file" name="file" />
             <button type="submit" class="btn">Add document</button>
         </form>

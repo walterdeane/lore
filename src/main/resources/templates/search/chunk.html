@@ -18,7 +18,40 @@
     </div>
 
     <div th:if="${chunk != null}">
+
+        <section class="card" style="margin-bottom: 1rem;" th:if="${document != null}">
+            <h2>Document</h2>
+            <dl class="meta-list">
+                <div class="meta-item">
+                    <dt>Title</dt>
+                    <dd th:text="${document.title}">title</dd>
+                </div>
+                <div class="meta-item" th:if="${document.author != null}">
+                    <dt>Author</dt>
+                    <dd th:text="${document.author}">author</dd>
+                </div>
+                <div class="meta-item">
+                    <dt>Source File</dt>
+                    <dd th:text="${document.sourceFilename}">file</dd>
+                </div>
+                <div class="meta-item">
+                    <dt>Type</dt>
+                    <dd th:text="${document.sourceType}">PDF</dd>
+                </div>
+                <div class="meta-item">
+                    <dt>Ingestion</dt>
+                    <dd>
+                        <span class="document-pill" th:text="${document.ingestionStatus}">status</span>
+                        <span class="document-pill document-pill-error"
+                              th:if="${document.ingestionError}"
+                              th:text="${document.ingestionError}">error</span>
+                    </dd>
+                </div>
+            </dl>
+        </section>
+
         <section class="card" style="margin-bottom: 1rem;">
+            <h2>Chunk</h2>
             <dl class="meta-list">
                 <div class="meta-item">
                     <dt>Chunk Index</dt>
