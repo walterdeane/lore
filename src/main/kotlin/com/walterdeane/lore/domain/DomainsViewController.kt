@@ -10,6 +10,7 @@ import org.springframework.stereotype.Controller
 import org.springframework.ui.Model
 import com.walterdeane.lore.model.ChunkingStrategy
 import com.walterdeane.lore.model.Domain
+import com.walterdeane.lore.model.StructuralVariant
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
@@ -32,6 +33,7 @@ private val tagsService: TagsService
         model.addAttribute("query", q)
         model.addAttribute("domainsPage", domainsService.getDomains(q, pageable))
         model.addAttribute("strategies", ChunkingStrategy.values())
+        model.addAttribute("variants", StructuralVariant.values())
         return "domain/index"
     }
 
@@ -42,6 +44,7 @@ private val tagsService: TagsService
             name = domainForm.name,
             description = domainForm.description,
             chunkStrategy = domainForm.chunkStrategy?.takeIf { it.isNotBlank() }?.let { ChunkingStrategy.valueOf(it) },
+            structuralVariant = domainForm.structuralVariant?.takeIf { it.isNotBlank() }?.let { StructuralVariant.valueOf(it) },
         ))
         return "redirect:/domains"
     }
@@ -53,6 +56,7 @@ private val tagsService: TagsService
             name = domainForm.name,
             description = domainForm.description,
             chunkStrategy = domainForm.chunkStrategy?.takeIf { it.isNotBlank() }?.let { ChunkingStrategy.valueOf(it) },
+            structuralVariant = domainForm.structuralVariant?.takeIf { it.isNotBlank() }?.let { StructuralVariant.valueOf(it) },
         ))
         redirectAttributes.addFlashAttribute("message", "Domain updated successfully")
         return "redirect:/domains"
@@ -70,4 +74,5 @@ data class DomainForm(
     val name: String,
     val description: String,
     val chunkStrategy: String? = null,
+    val structuralVariant: String? = null,
 )

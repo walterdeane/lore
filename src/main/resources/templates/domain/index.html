@@ -67,6 +67,10 @@
                 <option value="">Chunking strategy (default: TOKEN)</option>
                 <option th:each="s : ${strategies}" th:value="${s}" th:text="${s}"></option>
             </select>
+            <select name="structuralVariant">
+                <option value="">Structural variant (default: GENERIC)</option>
+                <option th:each="v : ${variants}" th:value="${v}" th:text="${v}"></option>
+            </select>
             <button type="submit" class="btn">Add domain</button>
         </form>
     </section>
@@ -94,6 +98,14 @@
                                 th:value="${s}"
                                 th:text="${s}"
                                 th:selected="${domain.chunkStrategy == s}">
+                        </option>
+                    </select>
+                    <select name="structuralVariant">
+                        <option value="" th:selected="${domain.structuralVariant == null}">Structural variant (default: GENERIC)</option>
+                        <option th:each="v : ${variants}"
+                                th:value="${v}"
+                                th:text="${v}"
+                                th:selected="${domain.structuralVariant == v}">
                         </option>
                     </select>
                     <button type="submit" class="btn">Save</button>

@@ -8,6 +8,7 @@ data class Domain(
     val name: String,
     val description: String,
     val chunkStrategy: ChunkingStrategy? = null,
+    val structuralVariant: StructuralVariant? = null,
 )
 
 data class Tag(
@@ -31,6 +32,7 @@ data class Document(
     val ingestionError: String? = null,
     val ingestedAt: Instant? = null,
     val chunkStrategy: ChunkingStrategy? = null,
+    val structuralVariant: StructuralVariant? = null,
 )
 
 data class Chunk(
@@ -50,6 +52,8 @@ data class Chunk(
 )
 
 enum class ChunkingStrategy { TOKEN, SEMANTIC, STRUCTURAL }
+
+enum class StructuralVariant { GENERIC, COOKBOOK, ACADEMIC }
 
 enum class SourceType {
     PDF,

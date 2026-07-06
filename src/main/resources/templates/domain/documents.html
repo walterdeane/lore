@@ -29,6 +29,10 @@
                 <option value="">Chunking strategy (inherit from domain)</option>
                 <option th:each="s : ${strategies}" th:value="${s}" th:text="${s}"></option>
             </select>
+            <select name="structuralVariant">
+                <option value="">Structural variant (inherit from domain)</option>
+                <option th:each="v : ${variants}" th:value="${v}" th:text="${v}"></option>
+            </select>
             <input type="file" name="file" />
             <button type="submit" class="btn">Add document</button>
         </form>

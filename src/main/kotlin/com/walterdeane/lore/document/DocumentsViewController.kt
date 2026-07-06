@@ -2,6 +2,7 @@ package com.walterdeane.lore.document
 
 import com.walterdeane.lore.domain.DomainsService
 import com.walterdeane.lore.model.ChunkingStrategy
+import com.walterdeane.lore.model.StructuralVariant
 import com.walterdeane.lore.tags.TagsService
 import org.springframework.core.io.FileSystemResource
 import org.springframework.data.domain.Pageable
@@ -44,6 +45,7 @@ class DocumentsViewController(
         model.addAttribute("documentsPage", documentsService.getDocuments(domainId, q, pageable))
         model.addAttribute("availableTags", tagsService.getDomainTags(domainId))
         model.addAttribute("strategies", ChunkingStrategy.values())
+        model.addAttribute("variants", StructuralVariant.values())
         return "domain/documents"
     }
 
@@ -68,11 +70,13 @@ class DocumentsViewController(
         @RequestParam("author", required = false) author: String?,
         @RequestParam("tags", required = false) tags: List<String>?,
         @RequestParam("chunkStrategy", required = false) chunkStrategy: String?,
+        @RequestParam("structuralVariant", required = false) structuralVariant: String?,
         @RequestParam("file") file: MultipartFile,
     ): String {
         val strategy = chunkStrategy?.takeIf { it.isNotBlank() }?.let { ChunkingStrategy.valueOf(it) }
+        val variant = structuralVariant?.takeIf { it.isNotBlank() }?.let { StructuralVariant.valueOf(it) }
         val document = documentsService.importDocument(
-            domainId, file.originalFilename ?: "untitled", file.bytes, title, author, tags ?: emptyList(), strategy
+            domainId, file.originalFilename ?: "untitled", file.bytes, title, author, tags ?: emptyList(), strategy, variant
         )
         return "redirect:/domains/$domainId/documents/${document.id}"
     }

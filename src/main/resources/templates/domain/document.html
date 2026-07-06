@@ -35,6 +35,7 @@
                 <span class="document-pill" th:text="${document.sourceType}">Source Type</span>
                 <span class="document-pill" th:text="${document.ingestionStatus}">Ingestion Status</span>
                 <span class="document-pill" th:text="'Strategy: ' + (${document.chunkStrategy} ?: 'domain default')">Strategy</span>
+                <span class="document-pill" th:text="'Variant: ' + (${document.structuralVariant} ?: 'domain default')">Variant</span>
                 <span class="document-pill document-pill-error"
                       th:if="${document.ingestionError}"
                       th:text="${document.ingestionError}">Ingestion Error</span>

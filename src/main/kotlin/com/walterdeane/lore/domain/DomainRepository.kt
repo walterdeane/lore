@@ -2,6 +2,7 @@ package com.walterdeane.lore.domain
 
 import com.walterdeane.lore.model.ChunkingStrategy
 import com.walterdeane.lore.model.Domain
+import com.walterdeane.lore.model.StructuralVariant
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.util.UUID
@@ -11,10 +12,10 @@ class DomainRepository(private val jdbcTemplate: JdbcTemplate) {
 
     fun findAll(query: String? = null): List<Domain> {
         if (query.isNullOrBlank()) {
-            return jdbcTemplate.query("SELECT id, name, description, chunk_strategy FROM domain") { rs, _ -> mapRow(rs) }
+            return jdbcTemplate.query("SELECT id, name, description, chunk_strategy, structural_variant FROM domain") { rs, _ -> mapRow(rs) }
         }
         return jdbcTemplate.query(
-            "SELECT id, name, description, chunk_strategy FROM domain WHERE name ILIKE ?",
+            "SELECT id, name, description, chunk_strategy, structural_variant FROM domain WHERE name ILIKE ?",
             { rs, _ -> mapRow(rs) },
             "%$query%"
         )
@@ -22,7 +23,7 @@ class DomainRepository(private val jdbcTemplate: JdbcTemplate) {
 
     fun findById(id: UUID): Domain? {
         return jdbcTemplate.query(
-            "SELECT id, name, description, chunk_strategy FROM domain WHERE id = ?",
+            "SELECT id, name, description, chunk_strategy, structural_variant FROM domain WHERE id = ?",
             { rs, _ -> mapRow(rs) },
             id
         ).firstOrNull()
@@ -30,16 +31,16 @@ class DomainRepository(private val jdbcTemplate: JdbcTemplate) {
 
     fun save(domain: Domain): Domain {
         jdbcTemplate.update(
-            "INSERT INTO domain (id, name, description, chunk_strategy) VALUES (?, ?, ?, ?)",
-            domain.id, domain.name, domain.description, domain.chunkStrategy?.name
+            "INSERT INTO domain (id, name, description, chunk_strategy, structural_variant) VALUES (?, ?, ?, ?, ?)",
+            domain.id, domain.name, domain.description, domain.chunkStrategy?.name, domain.structuralVariant?.name
         )
         return domain
     }
 
     fun update(domain: Domain): Domain {
         jdbcTemplate.update(
-            "UPDATE domain SET name = ?, description = ?, chunk_strategy = ? WHERE id = ?",
-            domain.name, domain.description, domain.chunkStrategy?.name, domain.id
+            "UPDATE domain SET name = ?, description = ?, chunk_strategy = ?, structural_variant = ? WHERE id = ?",
+            domain.name, domain.description, domain.chunkStrategy?.name, domain.structuralVariant?.name, domain.id
         )
         return domain
     }
@@ -53,5 +54,6 @@ class DomainRepository(private val jdbcTemplate: JdbcTemplate) {
         name = rs.getString("name"),
         description = rs.getString("description"),
         chunkStrategy = rs.getString("chunk_strategy")?.let { ChunkingStrategy.valueOf(it) },
+        structuralVariant = rs.getString("structural_variant")?.let { StructuralVariant.valueOf(it) },
     )
 }

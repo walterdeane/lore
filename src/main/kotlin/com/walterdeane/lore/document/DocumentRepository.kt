@@ -4,6 +4,7 @@ import com.walterdeane.lore.model.ChunkingStrategy
 import com.walterdeane.lore.model.Document
 import com.walterdeane.lore.model.IngestionStatus
 import com.walterdeane.lore.model.SourceType
+import com.walterdeane.lore.model.StructuralVariant
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
@@ -17,8 +18,8 @@ class DocumentRepository(private val jdbcTemplate: JdbcTemplate) {
     fun save(document: Document): Document {
         val sql =
             "INSERT INTO document (id, domain_id, title, author, source_filename, source_path, " +
-            " source_type, tags, ingestion_status, ingestion_error, ingested_at, chunk_strategy) " +
-            " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            " source_type, tags, ingestion_status, ingestion_error, ingested_at, chunk_strategy, structural_variant) " +
+            " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         jdbcTemplate.update(sql) { ps ->
             ps.setObject(1, document.id)
             ps.setObject(2, document.domainId)
@@ -32,6 +33,7 @@ class DocumentRepository(private val jdbcTemplate: JdbcTemplate) {
             ps.setString(10, document.ingestionError)
             ps.setTimestamp(11, document.ingestedAt?.let { Timestamp.from(it) })
             ps.setString(12, document.chunkStrategy?.name)
+            ps.setString(13, document.structuralVariant?.name)
         }
         return document
     }
@@ -110,5 +112,6 @@ class DocumentRepository(private val jdbcTemplate: JdbcTemplate) {
         ingestionError = rs.getString("ingestion_error"),
         ingestedAt = rs.getTimestamp("ingested_at")?.toInstant(),
         chunkStrategy = rs.getString("chunk_strategy")?.let { ChunkingStrategy.valueOf(it) },
+        structuralVariant = rs.getString("structural_variant")?.let { StructuralVariant.valueOf(it) },
     )
 }

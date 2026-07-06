@@ -2,6 +2,7 @@ package com.walterdeane.lore.document
 
 import com.walterdeane.lore.model.ChunkingStrategy
 import com.walterdeane.lore.model.Document
+import com.walterdeane.lore.model.StructuralVariant
 import com.walterdeane.lore.model.SourceType
 import com.walterdeane.lore.exception.UnsupportedDocumentTypeException
 import com.walterdeane.lore.model.IngestionStatus
@@ -47,7 +48,7 @@ class DocumentsService(
 
     fun getAvailableTags(domainId: UUID): List<String> = emptyList()
 
-    fun importDocument(domainId: UUID, filename: String, content: ByteArray, title: String?, author: String?, tags: List<String>, chunkStrategy: ChunkingStrategy? = null): Document {
+    fun importDocument(domainId: UUID, filename: String, content: ByteArray, title: String?, author: String?, tags: List<String>, chunkStrategy: ChunkingStrategy? = null, structuralVariant: StructuralVariant? = null): Document {
         val fileSuffix = filename.substringAfterLast('.', "").lowercase()
         val sourceType = when (fileSuffix) {
             "epub" -> SourceType.EPUB
@@ -69,6 +70,7 @@ class DocumentsService(
             tags = tags,
             ingestionStatus = IngestionStatus.PENDING,
             chunkStrategy = chunkStrategy,
+            structuralVariant = structuralVariant,
         )
         documentRepository.save(document)
 
