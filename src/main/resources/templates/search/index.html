@@ -29,7 +29,7 @@
                     <option th:each="tag : ${availableTags}"
                             th:value="${tag.path}"
                             th:text="${tag.name}"
-                            th:selected="${selectedTags.contains(tag.path)}">
+                            th:selected="${#lists.contains(selectedTags, tag.path)}">
                     </option>
                 </select>
                 <span th:if="${availableTags.isEmpty() and domainId != null}" class="text-dim" style="font-size:0.85rem;">No tags in this domain</span>
