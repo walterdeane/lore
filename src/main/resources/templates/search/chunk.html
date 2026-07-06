@@ -47,6 +47,19 @@
                               th:text="${document.ingestionError}">error</span>
                     </dd>
                 </div>
+                <div class="meta-item">
+                    <dt>Ingested At</dt>
+                    <dd>
+                        <time th:if="${document.ingestedAt != null}"
+                              class="local-time"
+                              th:attr="datetime=${document.ingestedAt}"
+                              th:text="${document.ingestedAt}">date</time>
+                        <span th:if="${document.ingestedAt == null}" class="text-dim"
+                              th:text="${document.ingestionStatus.name == 'IN_PROGRESS'} ? 'In progress…'
+                                      : (${document.ingestionStatus.name == 'FAILED'} ? 'Failed before completing'
+                                      : 'Not yet ingested')">status</span>
+                    </dd>
+                </div>
             </dl>
         </section>
 
@@ -90,5 +103,15 @@
     </div>
 
 </div>
+
+<script>
+document.querySelectorAll('time.local-time').forEach(function (el) {
+    var dt = new Date(el.getAttribute('datetime'));
+    el.textContent = dt.toLocaleString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+    });
+});
+</script>
 </body>
 </html>
