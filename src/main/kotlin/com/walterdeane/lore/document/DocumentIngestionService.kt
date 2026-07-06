@@ -22,6 +22,7 @@ class DocumentIngestionService(
     private val documentRepository: DocumentRepository,
     private val domainRepository: DomainRepository,
     private val chunkingStrategyResolver: ChunkingStrategyResolver,
+    private val structuralTextSplitter: StructuralTextSplitter,
 ) {
     private val log = LoggerFactory.getLogger(DocumentIngestionService::class.java)
 
@@ -44,9 +45,9 @@ class DocumentIngestionService(
             val tokenSplitter = TokenTextSplitter.builder().build()
             val splitDocuments = when (strategy) {
                 ChunkingStrategy.TOKEN -> tokenSplitter.split(pages)
-                ChunkingStrategy.SEMANTIC,
-                ChunkingStrategy.STRUCTURAL -> {
-                    log.warn("[{}] strategy {} not yet implemented, falling back to TOKEN", document.id, strategy)
+                ChunkingStrategy.STRUCTURAL -> structuralTextSplitter.split(pages)
+                ChunkingStrategy.SEMANTIC -> {
+                    log.warn("[{}] SEMANTIC strategy not yet implemented, falling back to TOKEN", document.id)
                     tokenSplitter.split(pages)
                 }
             }
