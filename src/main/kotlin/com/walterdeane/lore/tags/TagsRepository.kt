@@ -22,7 +22,7 @@ class TagsRepository(private val jdbcTemplate: JdbcTemplate) {
                 description = rs.getString("description"),
                 path = rs.getString("path")
             )
-        }, *(if (query.isNullOrBlank()) arrayOf(domainId) else arrayOf(domainId, "%$query%")))
+        }, *(if (query.isNullOrBlank()) arrayOf<Any?>(domainId) else arrayOf<Any?>(domainId, "%$query%")))
     }
 
     fun findAllChildren(id: UUID): List<Tag> {

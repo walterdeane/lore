@@ -41,12 +41,13 @@ class DocumentIngestionService(
             val pages = reader.get()
 
             log.info("[{}] chunking document", document.id)
+            val tokenSplitter = TokenTextSplitter.builder().build()
             val splitDocuments = when (strategy) {
-                ChunkingStrategy.TOKEN -> TokenTextSplitter().split(pages)
+                ChunkingStrategy.TOKEN -> tokenSplitter.split(pages)
                 ChunkingStrategy.SEMANTIC,
                 ChunkingStrategy.STRUCTURAL -> {
                     log.warn("[{}] strategy {} not yet implemented, falling back to TOKEN", document.id, strategy)
-                    TokenTextSplitter().split(pages)
+                    tokenSplitter.split(pages)
                 }
             }
 
