@@ -52,6 +52,10 @@
                         <span class="tag-pill" th:each="tag : ${result.tagPaths}" th:text="${tag}">tag</span>
                     </div>
                 </div>
+                <div class="result-source">
+                    <span class="result-title" th:text="${result.documentTitle}">Title</span>
+                    <span class="result-author text-dim" th:if="${result.documentAuthor != null}" th:text="${result.documentAuthor}">Author</span>
+                </div>
                 <p class="result-headline" th:utext="${result.headline}">…excerpt…</p>
                 <div class="result-footer">
                     <span class="text-dim" style="font-size:0.8rem;">

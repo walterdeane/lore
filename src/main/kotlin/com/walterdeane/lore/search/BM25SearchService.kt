@@ -17,6 +17,8 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
         val tagPaths: List<String>,
         val headline: String,
         val rank: Double,
+        val documentTitle: String,
+        val documentAuthor: String?,
     )
 
     data class SearchPage(
@@ -39,8 +41,11 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
             SELECT c.id, c.document_id, c.domain_id, c.chunk_index, c.chunk_strategy, c.tag_paths,
                    ts_rank_cd(c.search_vector, q) AS rank,
                    ts_headline('english', c.content, q, 'MaxWords=35, MinWords=15') AS headline,
-                   COUNT(*) OVER() AS total_count
-            FROM chunk c, plainto_tsquery('english', ?) q
+                   COUNT(*) OVER() AS total_count,
+                   d.title AS document_title, d.author AS document_author
+            FROM chunk c
+            JOIN document d ON d.id = c.document_id,
+            plainto_tsquery('english', ?) q
             WHERE c.search_vector @@ q
               AND c.domain_id = ?
               $tagClause
@@ -68,6 +73,8 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
                 tagPaths = (rs.getArray("tag_paths").array as Array<*>).map { it.toString() },
                 headline = rs.getString("headline"),
                 rank = rs.getDouble("rank"),
+                documentTitle = rs.getString("document_title"),
+                documentAuthor = rs.getString("document_author"),
             )
         }, *args)
 

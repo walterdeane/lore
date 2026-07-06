@@ -533,6 +533,21 @@ details summary {
     gap: 0.35rem;
 }
 
+.result-source {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.result-title {
+    font-weight: 600;
+    font-size: 0.925rem;
+}
+
+.result-author {
+    font-size: 0.825rem;
+}
+
 .result-headline {
     margin: 0;
     line-height: 1.6;
