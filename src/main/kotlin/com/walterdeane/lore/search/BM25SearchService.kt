@@ -19,7 +19,18 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
         val rank: Double,
     )
 
-    fun search(query: String, domainId: UUID, tags: List<String>? = null, limit: Int = 20): List<Result> {
+    data class SearchPage(
+        val results: List<Result>,
+        val total: Long,
+        val page: Int,
+        val size: Int,
+    ) {
+        val totalPages: Int get() = if (total == 0L) 1 else ((total + size - 1) / size).toInt()
+        val hasNext: Boolean get() = (page + 1).toLong() * size < total
+        val hasPrevious: Boolean get() = page > 0
+    }
+
+    fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage {
         val tagClause = if (!tags.isNullOrEmpty())
             "AND c.tag_paths && ARRAY[${tags.joinToString(",") { "?" }}]::ltree[]"
         else ""
@@ -27,23 +38,27 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
         val sql = """
             SELECT c.id, c.document_id, c.domain_id, c.chunk_index, c.chunk_strategy, c.tag_paths,
                    ts_rank_cd(c.search_vector, q) AS rank,
-                   ts_headline('english', c.content, q, 'MaxWords=35, MinWords=15') AS headline
+                   ts_headline('english', c.content, q, 'MaxWords=35, MinWords=15') AS headline,
+                   COUNT(*) OVER() AS total_count
             FROM chunk c, plainto_tsquery('english', ?) q
             WHERE c.search_vector @@ q
               AND c.domain_id = ?
               $tagClause
             ORDER BY rank DESC
-            LIMIT ?
+            LIMIT ? OFFSET ?
         """.trimIndent()
 
         val args = buildList<Any?> {
             add(query)
             add(domainId)
             if (!tags.isNullOrEmpty()) addAll(tags)
-            add(limit)
+            add(size)
+            add(page * size)
         }.toTypedArray()
 
-        return jdbcTemplate.query(sql, { rs, _ ->
+        var total = 0L
+        val results = jdbcTemplate.query(sql, { rs, rowNum ->
+            if (rowNum == 0) total = rs.getLong("total_count")
             Result(
                 chunkId = rs.getObject("id", UUID::class.java),
                 documentId = rs.getObject("document_id", UUID::class.java),
@@ -55,5 +70,7 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
                 rank = rs.getDouble("rank"),
             )
         }, *args)
+
+        return SearchPage(results, total, page, size)
     }
 }

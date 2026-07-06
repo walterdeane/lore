@@ -10,6 +10,8 @@ import java.util.UUID
 @Service
 class DomainsService(private val domainRepository: DomainRepository) {
 
+    fun getAllDomains(): List<Domain> = domainRepository.findAll()
+
     fun getDomains(query: String?, pageable: Pageable): Page<Domain> {
         val filtered = domainRepository.findAll(query)
         val start = pageable.offset.toInt().coerceIn(0, filtered.size)

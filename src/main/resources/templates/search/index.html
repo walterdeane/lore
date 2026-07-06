@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Search</title>
+</head>
+<body>
+<div layout:fragment="content">
+
+    <h1>Search</h1>
+    <p class="text-dim">Full-text keyword search across ingested chunks.</p>
+
+    <section class="card" style="margin-bottom: 1.5rem;">
+        <form th:action="@{/search}" method="get" class="search-form">
+            <div class="search-row">
+                <input type="text" name="q" placeholder="Search terms…" th:value="${q}" class="search-input" autofocus>
+                <button type="submit" class="btn">Search</button>
+            </div>
+            <div class="search-filters">
+                <select name="domainId" required>
+                    <option value="" disabled th:selected="${domainId == null}">Select a domain…</option>
+                    <option th:each="domain : ${domains}"
+                            th:value="${domain.id}"
+                            th:text="${domain.name}"
+                            th:selected="${domain.id == domainId}">
+                    </option>
+                </select>
+                <input type="text" name="tags" placeholder="Tags (comma-separated paths)" th:value="${tags}" class="tags-input">
+                <select name="size">
+                    <option th:each="n : ${ {10, 20, 50} }" th:value="${n}" th:text="${n} + ' results'" th:selected="${n == size}"></option>
+                </select>
+            </div>
+        </form>
+    </section>
+
+    <div th:if="${searchPage != null}">
+
+        <div class="search-meta text-dim" th:if="${searchPage.total > 0}">
+            <span th:text="${searchPage.total} + ' result' + (${searchPage.total} != 1 ? 's' : '')">N results</span>
+            <span th:if="${searchPage.totalPages > 1}"
+                  th:text="' — page ' + (${searchPage.page} + 1) + ' of ' + ${searchPage.totalPages}">page</span>
+        </div>
+
+        <p class="text-dim" th:if="${searchPage.total == 0}">No results found for this query.</p>
+
+        <ul class="result-list">
+            <li class="result-card card" th:each="result : ${searchPage.results}">
+                <div class="result-header">
+                    <span class="result-rank" th:text="${#numbers.formatDecimal(result.rank, 1, 4)}">0.0</span>
+                    <div class="result-tags">
+                        <span class="tag-pill" th:each="tag : ${result.tagPaths}" th:text="${tag}">tag</span>
+                    </div>
+                </div>
+                <p class="result-headline" th:utext="${result.headline}">…excerpt…</p>
+                <div class="result-footer">
+                    <span class="text-dim" style="font-size:0.8rem;">
+                        chunk <span th:text="${result.chunkIndex}">0</span>
+                        &middot; <span th:text="${result.chunkStrategy}">TOKEN</span>
+                    </span>
+                    <a class="btn btn-secondary"
+                       th:href="@{/search/chunks/{id}(id=${result.chunkId}, q=${q})}">
+                        View full chunk
+                    </a>
+                </div>
+            </li>
+        </ul>
+
+        <nav class="pager" th:if="${searchPage.totalPages > 1}">
+            <a th:if="${searchPage.hasPrevious}"
+               th:href="@{/search(q=${q}, domainId=${domainId}, tags=${tags}, size=${size}, page=${searchPage.page - 1})}"
+               class="btn btn-secondary">&larr; Previous</a>
+            <span class="text-dim">
+                Page <span th:text="${searchPage.page + 1}">1</span>
+                of <span th:text="${searchPage.totalPages}">1</span>
+            </span>
+            <a th:if="${searchPage.hasNext}"
+               th:href="@{/search(q=${q}, domainId=${domainId}, tags=${tags}, size=${size}, page=${searchPage.page + 1})}"
+               class="btn btn-secondary">Next &rarr;</a>
+        </nav>
+
+    </div>
+
+</div>
+</body>
+</html>

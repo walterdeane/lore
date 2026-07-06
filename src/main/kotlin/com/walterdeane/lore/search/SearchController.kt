@@ -16,7 +16,8 @@ class SearchController(private val bm25SearchService: BM25SearchService) {
         @RequestParam q: String,
         @RequestParam domainId: UUID,
         @RequestParam(required = false) tags: List<String>?,
-        @RequestParam(defaultValue = "20") limit: Int,
-    ): ResponseEntity<List<BM25SearchService.Result>> =
-        ResponseEntity.ok(bm25SearchService.search(q, domainId, tags, limit))
+        @RequestParam(defaultValue = "20") size: Int,
+        @RequestParam(defaultValue = "0") page: Int,
+    ): ResponseEntity<BM25SearchService.SearchPage> =
+        ResponseEntity.ok(bm25SearchService.search(q, domainId, tags, size, page))
 }

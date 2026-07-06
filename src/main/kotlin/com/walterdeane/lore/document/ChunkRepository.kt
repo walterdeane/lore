@@ -1,13 +1,41 @@
 package com.walterdeane.lore.document
 
 import com.walterdeane.lore.model.Chunk
+import com.walterdeane.lore.model.ChunkingStrategy
 import org.postgresql.util.PGobject
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import java.sql.ResultSet
 import java.sql.Timestamp
+import java.util.UUID
 
 @Repository
 class ChunkRepository(private val jdbcTemplate: JdbcTemplate) {
+
+    fun findById(id: UUID): Chunk? =
+        jdbcTemplate.query(
+            """SELECT id, document_id, domain_id, tag_paths, content, chunk_index,
+                      chunk_strategy, parent_chunk_id, chunk_level, page_number, token_count, created_at
+               FROM chunk WHERE id = ?""",
+            { rs, _ -> mapRow(rs) },
+            id
+        ).firstOrNull()
+
+    private fun mapRow(rs: ResultSet) = Chunk(
+        id = rs.getObject("id", UUID::class.java),
+        documentId = rs.getObject("document_id", UUID::class.java),
+        domainId = rs.getObject("domain_id", UUID::class.java),
+        tagPaths = (rs.getArray("tag_paths").array as Array<*>).map { it.toString() },
+        content = rs.getString("content"),
+        embedding = emptyList(),
+        chunkIndex = rs.getInt("chunk_index"),
+        chunkStrategy = ChunkingStrategy.valueOf(rs.getString("chunk_strategy")),
+        parentChunkId = rs.getObject("parent_chunk_id", UUID::class.java),
+        chunkLevel = rs.getString("chunk_level"),
+        pageNumber = rs.getInt("page_number").takeIf { !rs.wasNull() },
+        tokenCount = rs.getInt("token_count").takeIf { !rs.wasNull() },
+        createdAt = rs.getTimestamp("created_at").toInstant(),
+    )
 
     fun save(chunk: Chunk): Chunk {
         val sql =

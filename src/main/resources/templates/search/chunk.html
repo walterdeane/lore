@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Chunk</title>
+</head>
+<body>
+<div layout:fragment="content">
+
+    <div class="page-header">
+        <h1>Chunk Detail</h1>
+        <a th:href="@{/search(q=${q})}" class="btn btn-secondary">&larr; Back to results</a>
+    </div>
+
+    <div th:if="${chunk == null}">
+        <p class="text-dim">Chunk not found.</p>
+    </div>
+
+    <div th:if="${chunk != null}">
+        <section class="card" style="margin-bottom: 1rem;">
+            <dl class="meta-list">
+                <div class="meta-item">
+                    <dt>Chunk Index</dt>
+                    <dd th:text="${chunk.chunkIndex}">0</dd>
+                </div>
+                <div class="meta-item">
+                    <dt>Strategy</dt>
+                    <dd th:text="${chunk.chunkStrategy}">TOKEN</dd>
+                </div>
+                <div class="meta-item" th:if="${chunk.pageNumber != null}">
+                    <dt>Page Number</dt>
+                    <dd th:text="${chunk.pageNumber}">1</dd>
+                </div>
+                <div class="meta-item" th:if="${chunk.tokenCount != null}">
+                    <dt>Token Count</dt>
+                    <dd th:text="${chunk.tokenCount}">0</dd>
+                </div>
+                <div class="meta-item">
+                    <dt>Document ID</dt>
+                    <dd th:text="${chunk.documentId}">uuid</dd>
+                </div>
+                <div class="meta-item" th:if="${not chunk.tagPaths.isEmpty()}">
+                    <dt>Tags</dt>
+                    <dd>
+                        <span class="tag-pill" th:each="tag : ${chunk.tagPaths}" th:text="${tag}">tag</span>
+                    </dd>
+                </div>
+            </dl>
+        </section>
+
+        <section class="card">
+            <h2>Content</h2>
+            <pre class="chunk-content" th:text="${chunk.content}">chunk text</pre>
+        </section>
+    </div>
+
+</div>
+</body>
+</html>
