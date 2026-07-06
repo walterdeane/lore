@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Document</title>
+</head>
+<body>
+<div layout:fragment="content">
+
+    <nav th:replace="~{fragments/domain-nav :: nav(${domain.id})}"></nav>
+
+    <p th:if="${message}" class="flash flash-success" th:text="${message}">Success message</p>
+    <p th:if="${error}" class="flash flash-error" th:text="${error}">Error message</p>
+
+    <div class="page-header">
+        <h1 th:text="${document.title}">Document name</h1>
+        <form th:action="@{/domains/{id}/documents/{documentId}(id=${domain.id}, documentId=${document.id})}"
+              method="post" class="inline-form"
+              onsubmit="return confirm('Delete this document? This action cannot be undone.');">
+            <input type="hidden" name="_method" value="delete">
+            <button type="submit" class="btn btn-danger">Delete</button>
+        </form>
+    </div>
+
+    <section>
+        <div class="card">
+            <div class="document-meta">
+                <span class="document-pill" th:text="${document.sourceType}">Source Type</span>
+                <span class="document-pill" th:text="${document.ingestionStatus}">Ingestion Status</span>
+                <span class="document-pill document-pill-error"
+                      th:if="${document.ingestionError}"
+                      th:text="${document.ingestionError}">Ingestion Error</span>
+            </div>
+
+            <dl class="meta-list">
+                <div class="meta-item">
+                    <dt>Source Filename</dt>
+                    <dd th:text="${document.sourceFilename}">filename</dd>
+                </div>
+                <div class="meta-item">
+                    <dt>Ingested At</dt>
+                    <dd th:text="${document.ingestedAt} ?: 'Not yet ingested'">ingested at</dd>
+                </div>
+                <div class="meta-item" th:if="${not document.tags.isEmpty()}">
+                    <dt>Tags</dt>
+                    <dd>
+                        <span class="tag-pill" th:each="tag : ${document.tags}" th:text="${tag}">tag</span>
+                    </dd>
+                </div>
+            </dl>
+
+            <form th:action="@{/domains/{id}/documents/{documentId}(id=${domain.id}, documentId=${document.id})}"
+                  method="post" class="document-form">
+                <input type="hidden" name="_method" value="update">
+                <div class="field-group">
+                    <label for="title">Title</label>
+                    <input type="text" id="title" name="title" th:value="${document.title}" required>
+                </div>
+                <div class="field-group">
+                    <label for="author">Author</label>
+                    <input type="text" id="author" name="author" th:value="${document.author}">
+                </div>
+                <div class="field-group">
+                    <label for="sourcePath">Source Path</label>
+                    <input type="text" id="sourcePath" name="sourcePath" th:value="${document.sourcePath}" required>
+                </div>
+                <button type="submit" class="btn">Update</button>
+            </form>
+
+            <details>
+                <summary>Edit Tags</summary>
+                <form th:action="@{/domains/{id}/documents/{documentId}/tags(id=${domain.id}, documentId=${document.id})}"
+                      method="post" class="document-form">
+                    <input type="hidden" name="_method" value="put">
+                    <select name="tags" multiple required>
+                        <option th:each="tag : ${availableTags}"
+                                th:value="${tag.id}"
+                                th:text="${tag.path}"
+                                th:selected="${document.tags.contains(tag)}">
+                        </option>
+                    </select>
+                    <button type="submit" class="btn">Save</button>
+                </form>
+            </details>
+        </div>
+    </section>
+</div>
+</body>
+</html>

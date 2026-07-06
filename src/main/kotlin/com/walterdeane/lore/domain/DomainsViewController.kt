@@ -9,14 +9,19 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes
 import org.springframework.stereotype.Controller
 import org.springframework.ui.Model
 import com.walterdeane.lore.model.Domain
+import com.walterdeane.lore.model.Tag
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
 import org.springframework.web.bind.annotation.RequestParam
+import com.walterdeane.lore.tags.TagsService
 import java.util.UUID
 
 @Controller
-class DomainsViewController(private val domainsService: DomainsService) {
+class DomainsViewController(
+    private val domainsService: DomainsService,
+private val tagsService: TagsService
+) {
 
     @GetMapping("/domains")
     fun showPage(
@@ -31,17 +36,19 @@ class DomainsViewController(private val domainsService: DomainsService) {
 
     @PostMapping("/domains")
     fun createDomain(@ModelAttribute domainForm: DomainForm): String {
-        domainsService.createDomain(Domain(
+        val domain = Domain(
             id = UUID.randomUUID(),
             name = domainForm.name,
             description = domainForm.description
-        ))
+        )
+        domainsService.createDomain(domain)
         return "redirect:/domains"
     }
 
+
     @PutMapping("/domains/{id}")
     fun updateDomainById(@PathVariable id: UUID, @ModelAttribute domainForm: DomainForm, redirectAttributes: RedirectAttributes): String {
-        domainsService.updateDomainById(id, Domain(
+        domainsService.updateDomainById(Domain(
             id = id,
             name = domainForm.name,
             description = domainForm.description

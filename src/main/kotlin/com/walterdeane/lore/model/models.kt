@@ -7,6 +7,7 @@ data class Domain(
     val id: UUID,
     val name: String,
     val description: String,
+    val chunkStrategy: ChunkingStrategy? = null,
 )
 
 data class Tag(
@@ -14,21 +15,22 @@ data class Tag(
     val domainId: UUID,
     val name: String,
     val description: String,
-    val path: String, //materialized path for hierarchical tags, e.g. "Science/Physics/Quantum Mechanics"
+    val path: String,
 )
 
 data class Document(
     val id: UUID,
     val title: String,
-    val author: String?,
+    val author: String? = null,
     val sourceFilename: String,
     val sourcePath: String,
     val sourceType: SourceType,
     val tags: List<String>,
     val domainId: UUID,
     val ingestionStatus: IngestionStatus,
-    val ingestionError: String?,
-    val ingestedAt: Instant?
+    val ingestionError: String? = null,
+    val ingestedAt: Instant? = null,
+    val chunkStrategy: ChunkingStrategy? = null,
 )
 
 data class Chunk(
@@ -37,12 +39,17 @@ data class Chunk(
     val domainId: UUID,
     val tagPaths: List<String>,
     val content: String,
-    val embedding: List<Float>, //(pgvector `vector` type)
+    val embedding: List<Float>,
     val chunkIndex: Int,
-    val pageNumber: Int?,
-    val tokenCount: Int?,
+    val chunkStrategy: ChunkingStrategy = ChunkingStrategy.TOKEN,
+    val parentChunkId: UUID? = null,
+    val chunkLevel: String? = null,
+    val pageNumber: Int? = null,
+    val tokenCount: Int? = null,
     val createdAt: Instant,
 )
+
+enum class ChunkingStrategy { TOKEN, SEMANTIC, STRUCTURAL }
 
 enum class SourceType {
     PDF,

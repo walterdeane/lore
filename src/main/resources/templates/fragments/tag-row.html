@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="tagRow(domainId, tagNode, depth, parentId)">
+    <tr th:attr="data-tag-id=${tagNode.tag.id},data-parent-id=${parentId}">
+        <td th:style="'padding-left: ' + (${depth} * 1.25) + 'rem'">
+            <input type="text" class="tag-cell-input" name="name" th:value="${tagNode.tag.name}"
+                   th:attr="form=|tag-form-${tagNode.tag.id}|" required>
+        </td>
+        <td>
+            <input type="text" class="tag-cell-input" name="path" th:value="${tagNode.tag.path}"
+                   th:attr="form=|tag-form-${tagNode.tag.id}|" readonly>
+        </td>
+        <td>
+            <input type="text" class="tag-cell-input" name="description" th:value="${tagNode.tag.description}"
+                   th:attr="form=|tag-form-${tagNode.tag.id}|">
+        </td>
+        <td class="tags-table-actions">
+            <form th:id="|tag-form-${tagNode.tag.id}|"
+                  th:action="@{/domains/{id}/tags/{tagId}(id=${domainId}, tagId=${tagNode.tag.id})}"
+                  method="post" class="inline-form">
+                <input type="hidden" name="_method" value="put">
+                <button type="submit" class="btn">Save</button>
+            </form>
+            <form th:if="${tagNode.children.isEmpty()}"
+                  th:action="@{/domains/{id}/tags/{tagId}(id=${domainId}, tagId=${tagNode.tag.id})}"
+                  method="post" class="inline-form"
+                  onsubmit="return confirm('Delete this tag? This action cannot be undone.');">
+                <input type="hidden" name="_method" value="delete">
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </td>
+    </tr>
+    <th:block th:each="childNode : ${tagNode.children}">
+        <tr th:replace="~{fragments/tag-row :: tagRow(${domainId}, ${childNode}, ${depth + 1}, ${tagNode.tag.id})}"></tr>
+    </th:block>
+</th:block>
+</body>
+</html>

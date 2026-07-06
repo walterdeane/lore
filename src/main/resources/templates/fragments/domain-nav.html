@@ -3,7 +3,7 @@
 <body>
 <nav th:fragment="nav(domainId)" class="domain-nav">
     <a th:href="@{/domains/{id}/tags(id=${domainId})}">Tags</a>
-    <!-- Documents view not built yet: th:href="@{/domains/{id}/documents(id=${domainId})}" -->
+    <a th:href="@{/domains/{id}/documents(id=${domainId})}">Documents</a>
 </nav>
 </body>
 </html>

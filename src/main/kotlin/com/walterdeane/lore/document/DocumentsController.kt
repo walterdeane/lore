@@ -15,30 +15,30 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE
 import org.springframework.stereotype.Controller
 import com.walterdeane.lore.model.Document
+
 import java.util.UUID
 
 @Controller
-class DocumentsController {
+class DocumentsController(private val documentsService: DocumentsService) {
 
-@PostMapping("/documents", consumes = [MULTIPART_FORM_DATA_VALUE])
+@PostMapping("/api/documents", consumes = [MULTIPART_FORM_DATA_VALUE])
 fun uploadDocument(
     @RequestParam("file") file: MultipartFile,
     @RequestParam("domainId") domainId: UUID,
     @RequestParam("title", required = false) title: String?,
     @RequestParam("author", required = false) author: String?,
+    @RequestParam("tags", required = false) tags: List<String>?,
 ): ResponseEntity<Void> {
-    // Placeholder: persist file to storage, create Document row (PENDING),
-    // trigger async ingestion job
-    val createdId = UUID.randomUUID() // replace with actual saved Document id
+    val document = documentsService.importDocument(domainId, file.originalFilename ?: "untitled", file.bytes, title, author, tags ?: emptyList())
 
     val location = ServletUriComponentsBuilder.fromCurrentRequest()
         .path("/{id}")
-        .buildAndExpand(createdId)
+        .buildAndExpand(document.id)
         .toUri()
-    return ResponseEntity.created(location).build()
+    return ResponseEntity.accepted().location(location).build()
 }
 
-@GetMapping("/documents/{id}")
+@GetMapping("/api/documents/{id}")
 fun getDocumentById(@PathVariable id: UUID): ResponseEntity<Document> {
     // Placeholder: retrieve Document by id, including ingestionStatus
     val document = Document(
@@ -57,7 +57,7 @@ fun getDocumentById(@PathVariable id: UUID): ResponseEntity<Document> {
     return ResponseEntity.ok(document)
 }  
 
-@GetMapping("/documents/{id}/chunks")
+@GetMapping("/api/documents/{id}/chunks")
 fun getDocumentChunks(@PathVariable id: UUID): ResponseEntity<List<String>> {
     // Placeholder: retrieve chunks for document id, return chunk content or metadata for debugging
     val chunks = listOf(
@@ -68,20 +68,20 @@ fun getDocumentChunks(@PathVariable id: UUID): ResponseEntity<List<String>> {
     return ResponseEntity.ok(chunks)
 }
 
-@DeleteMapping("/documents/{id}")
+@DeleteMapping("/api/documents/{id}")
 fun deleteDocumentById(@PathVariable id: UUID): ResponseEntity<Void> {
     // Placeholder: delete document by id, including all associated chunks
     return ResponseEntity.noContent().build()
 }
 
-@PostMapping("/documents/{id}/reingest")    
+@PostMapping("/api/documents/{id}/reingest")
 fun reingestDocument(@PathVariable id: UUID): ResponseEntity<Void> {
     // Placeholder: trigger async reingestion job for document id with current config
 
     return ResponseEntity.accepted().build()
 }
 
-@GetMapping("/domains/{domainId}/documents")
+@GetMapping("/api/domains/{domainId}/documents")
 fun getDocumentsByDomainId(@PathVariable domainId: UUID): ResponseEntity<List<Document>> {
     // Placeholder: retrieve documents by domain id
     val documents = listOf(
@@ -115,7 +115,7 @@ fun getDocumentsByDomainId(@PathVariable domainId: UUID): ResponseEntity<List<Do
     return ResponseEntity.ok(documents)
 }
 
-@PutMapping("/documents/{id}/tags")
+@PutMapping("/api/documents/{id}/tags")
 fun updateDocumentTags(@PathVariable id: UUID, @RequestBody tags: List<String>): ResponseEntity<Void> {
     // Placeholder: replace/set tag list for document id
     return ResponseEntity.ok().build()

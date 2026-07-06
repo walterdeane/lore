@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Documents</title>
+</head>
+<body>
+<div layout:fragment="content">
+
+    <nav th:replace="~{fragments/domain-nav :: nav(${domain.id})}"></nav>
+
+    <p th:if="${message}" class="flash flash-success" th:text="${message}">Success message</p>
+    <p th:if="${error}" class="flash flash-error" th:text="${error}">Error message</p>
+
+    <h1><span th:text="${domain.name}">Domain Name</span> Domain Documents</h1>
+    <section class="card" style="margin-bottom: 1.5rem;">
+        <h2>Add a document</h2>
+        <form th:action="@{/domains/{id}/documents(id=${domain.id})}" method="post" class="document-form"  enctype="multipart/form-data">
+            <input type="text" name="title" placeholder="Title" required>
+            <input type="text" name="author" placeholder="Author">
+                    <select name="tags" multiple required>
+                        <option th:each="tag : ${availableTags}"
+                                th:value="${tag.id}"
+                                th:text="${tag.path}">
+                        </option>
+                    </select>
+            <input type="file" name="file" />
+            <button type="submit" class="btn">Add document</button>
+        </form>
+    </section>
+
+    <form th:action="@{/domains/{id}/documents(id=${domain.id})}" method="get" class="document-form" style="margin-bottom: 1.5rem;">
+        <input type="text" name="q" placeholder="Search documents" th:value="${query}">
+        <button type="submit" class="btn btn-secondary">Search</button>
+    </form>
+
+    <section class="card-grid">
+        <div class="card" th:each="document : ${documentsPage.content}">
+            <h3 th:text="${document.title}">Document name</h3>
+            <p class="text-dim" th:text="${document.author}">Author</p>
+            <div class="document-actions">
+                <a class="btn btn-secondary"
+                   th:href="@{/domains/{id}/documents/{documentId}(id=${domain.id}, documentId=${document.id})}">
+                    View document
+                </a>
+            </div>
+            <form th:action="@{/domains/{id}/documents/{documentId}(id=${domain.id}, documentId=${document.id})}"
+                  method="post" class="delete-form">
+                <input type="hidden" name="_method" value="delete">
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </div>
+    </section>
+
+    <p th:if="${documentsPage.content.isEmpty()}" class="text-dim">No documents found.</p>
+
+    <nav class="pager" th:if="${documentsPage.totalPages > 1}">
+        <a th:if="${documentsPage.hasPrevious()}"
+           th:href="@{/domains/{id}/documents(id=${domain.id}, page=${documentsPage.number - 1}, q=${query})}"
+           class="btn btn-secondary">&larr; Previous</a>
+        <span class="text-dim">Page <span th:text="${documentsPage.number + 1}">1</span> of <span th:text="${documentsPage.totalPages}">1</span></span>
+        <a th:if="${documentsPage.hasNext()}"
+           th:href="@{/domains/{id}/documents(id=${domain.id}, page=${documentsPage.number + 1}, q=${query})}"
+           class="btn btn-secondary">Next &rarr;</a>
+    </nav>
+
+</div>
+</body>
+</html>

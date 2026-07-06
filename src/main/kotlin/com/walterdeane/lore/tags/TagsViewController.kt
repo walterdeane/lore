@@ -1,8 +1,6 @@
 package com.walterdeane.lore.tags
 
 import java.util.UUID
-import org.springframework.data.domain.Pageable
-import org.springframework.data.web.PageableDefault
 import org.springframework.stereotype.Controller
 import org.springframework.ui.Model
 import org.springframework.web.bind.annotation.GetMapping
@@ -14,26 +12,33 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ModelAttribute
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.servlet.mvc.support.RedirectAttributes
+import com.walterdeane.lore.domain.DomainsService
+import com.walterdeane.lore.model.Tag
 
 @Controller()
-class TagsViewController(val tagsService: TagsService) {
+class TagsViewController(val tagsService: TagsService, val domainsService: DomainsService) {
 
     @GetMapping("/domains/{id}/tags")
     fun showPage(
         @PathVariable id: UUID,
         @RequestParam(required = false) q: String?,
-        @PageableDefault(size = 25, sort = ["name"]) pageable: Pageable,
         model: Model
     ): String {
-        model.addAttribute("domainId", id)
-        model.addAttribute("tagsPage", tagsService.getTagsForDomain(id, q, pageable))
+        model.addAttribute("domain", domainsService.getDomainById(id))
+        model.addAttribute("tagTree", tagsService.getTagTree(id, q))
         model.addAttribute("query", q)
         return "domain/tags"
     }
 
     @PostMapping("/domains/{id}/tags")
     fun createTag(@PathVariable id: UUID, @ModelAttribute tag: TagForm, redirectAttributes: RedirectAttributes): String {
-        tagsService.createTag(id, tag)
+        tagsService.createTag(Tag(
+            id = UUID.randomUUID(),
+            domainId = id,
+            name = tag.name,
+            description = tag.description,
+            path = tag.path
+        ))
         redirectAttributes.addFlashAttribute("message", "Tag created successfully")
         return "redirect:/domains/$id/tags"
     }
@@ -42,10 +47,17 @@ class TagsViewController(val tagsService: TagsService) {
     fun updateTag(
             @PathVariable id: UUID,
             @PathVariable tagId: UUID,
-            @ModelAttribute tag: TagForm,
+            @ModelAttribute tagForm: TagForm,
             redirectAttributes: RedirectAttributes
     ): String {
-        tagsService.updateTag(id, tagId, tag)
+        val tag = Tag(
+            id = tagId,
+            domainId = id,
+            name = tagForm.name,
+            description = tagForm.description,
+            path = tagForm.path
+        )
+        tagsService.updateTag(tag)
         redirectAttributes.addFlashAttribute("message", "Tag updated successfully")
         return "redirect:/domains/$id/tags" // Redirect back to tags page after update
     }
@@ -56,21 +68,9 @@ class TagsViewController(val tagsService: TagsService) {
             @PathVariable tagId: UUID,
             redirectAttributes: RedirectAttributes
         ): String {
-        tagsService.deleteTag(id, tagId)
+        tagsService.deleteTag(tagId)
         redirectAttributes.addFlashAttribute("message", "Tag deleted successfully")
         return "redirect:/domains/$id/tags" // Redirect back to tags page after deletion
-    }
-
-    @GetMapping("/domains/{id}/tags/{tagId}/children")
-    fun getChildTags(
-        @PathVariable id: UUID, 
-        @PathVariable tagId: UUID,
-        model: Model
-        ): String {
-        model.addAttribute("domainId", id)
-        model.addAttribute("tagId", tagId)
-        model.addAttribute("childTags", tagsService.getChildTags(id, tagId))
-        return "domain/child-tags" // Return view for displaying child tags
     }
 
 }

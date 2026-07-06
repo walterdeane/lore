@@ -77,20 +77,6 @@
             
             <h3 th:text="${domain.name}">Domain name</h3>
             <p class="text-dim" th:text="${domain.description}">Description</p>
-
-            <div class="domain-actions">
-                <a class="btn btn-secondary"
-                   th:href="@{/domains/{id}/tags(id=${domain.id})}">
-                    View tags
-                </a>
-
-                <form th:action="@{/domains/{id}(id=${domain.id})}"
-                      method="post" class="inline-form">
-                    <input type="hidden" name="_method" value="delete">
-                    <button type="submit" class="btn btn-secondary">Delete</button>
-                </form>
-            </div>
-
             <details>
                 <summary>Edit</summary>
                 <form th:action="@{/domains/{id}(id=${domain.id})}"
@@ -101,6 +87,24 @@
                     <button type="submit" class="btn">Save</button>
                 </form>
             </details>
+            <div class="domain-actions">
+                <a class="btn btn-secondary"
+                   th:href="@{/domains/{id}/tags(id=${domain.id})}">
+                    View tags
+                </a>
+
+                <a class="btn btn-secondary"
+                   th:href="@{/domains/{id}/documents(id=${domain.id})}">
+                    View documents
+                </a>
+            </div>
+            <form th:action="@{/domains/{id}(id=${domain.id})}"
+                  method="post" class="delete-form">
+                <input type="hidden" name="_method" value="delete">
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+
+
         </div>
     </section>
 
