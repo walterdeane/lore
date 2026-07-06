@@ -18,7 +18,7 @@
                 <button type="submit" class="btn">Search</button>
             </div>
             <div class="search-filters">
-                <select name="domainId" required>
+                <select name="domainId" required onchange="this.form.submit()">
                     <option value="" disabled th:selected="${domainId == null}">Select a domain…</option>
                     <option th:each="domain : ${domains}"
                             th:value="${domain.id}"
@@ -26,7 +26,14 @@
                             th:selected="${domain.id == domainId}">
                     </option>
                 </select>
-                <input type="text" name="tags" placeholder="Tags (comma-separated paths)" th:value="${tags}" class="tags-input">
+                <select name="tags" multiple th:if="${not availableTags.isEmpty()}">
+                    <option th:each="tag : ${availableTags}"
+                            th:value="${tag.path}"
+                            th:text="${tag.name}"
+                            th:selected="${selectedTags.contains(tag.path)}">
+                    </option>
+                </select>
+                <span th:if="${availableTags.isEmpty() and domainId != null}" class="text-dim" style="font-size:0.85rem;">No tags in this domain</span>
                 <select name="size">
                     <option th:each="n : ${ {10, 20, 50} }" th:value="${n}" th:text="${n} + ' results'" th:selected="${n == size}"></option>
                 </select>
@@ -72,14 +79,14 @@
 
         <nav class="pager" th:if="${searchPage.totalPages > 1}">
             <a th:if="${searchPage.hasPrevious}"
-               th:href="@{/search(q=${q}, domainId=${domainId}, tags=${tags}, size=${size}, page=${searchPage.page - 1})}"
+               th:href="@{/search(q=${q}, domainId=${domainId}, tags=${selectedTags}, size=${size}, page=${searchPage.page - 1})}"
                class="btn btn-secondary">&larr; Previous</a>
             <span class="text-dim">
                 Page <span th:text="${searchPage.page + 1}">1</span>
                 of <span th:text="${searchPage.totalPages}">1</span>
             </span>
             <a th:if="${searchPage.hasNext}"
-               th:href="@{/search(q=${q}, domainId=${domainId}, tags=${tags}, size=${size}, page=${searchPage.page + 1})}"
+               th:href="@{/search(q=${q}, domainId=${domainId}, tags=${selectedTags}, size=${size}, page=${searchPage.page + 1})}"
                class="btn btn-secondary">Next &rarr;</a>
         </nav>
 
