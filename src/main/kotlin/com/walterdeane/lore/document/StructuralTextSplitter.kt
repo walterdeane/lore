@@ -66,7 +66,7 @@ class StructuralTextSplitter(
         }
 
         if (markdown.isNotBlank()) {
-            val chunks = markdownChunker.split(markdown, config.markdownHeadingLevel, config.minChunkChars)
+            val chunks = markdownChunker.split(markdown, config.markdownHeadingLevel, config.minChunkChars, config.excludedHeaders)
             if (chunks.size >= 3) {
                 log.info("[{}] markdown chunking: {} chunks from {}", variant, chunks.size, sourceType)
                 return chunks.map { Document(it) }

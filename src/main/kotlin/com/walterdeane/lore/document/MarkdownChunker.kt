@@ -11,24 +11,40 @@ class MarkdownChunker {
     /**
      * Split markdown text into chunks at heading boundaries.
      *
-     * Tries [preferredLevel] first (e.g. ## = level 2). If that produces fewer than
-     * 3 chunks it tries adjacent levels so a book whose recipes are ### still splits
-     * correctly without manual config.
+     * When [excludedHeaders] is provided (e.g. "ingredients", "method") the effective
+     * split level is auto-detected by finding which heading level directly parents those
+     * sub-headers — so a cookbook structured as `### Recipe / #### Ingredients` splits
+     * at ### rather than the default ##. Excluded headings within a chunk are kept as
+     * body content rather than used as split boundaries.
+     *
+     * Falls back to trying adjacent levels if the detected level yields fewer than 3 chunks.
      */
-    fun split(markdown: String, preferredLevel: Int = 2, minChunkChars: Int = 200): List<String> {
+    fun split(
+        markdown: String,
+        preferredLevel: Int = 2,
+        minChunkChars: Int = 200,
+        excludedHeaders: Set<String> = emptySet(),
+    ): List<String> {
         if (markdown.isBlank()) return emptyList()
 
-        var chunks = splitAtLevel(markdown, preferredLevel)
+        val effectiveLevel = if (excludedHeaders.isNotEmpty()) {
+            detectRecipeLevel(markdown, excludedHeaders)?.also {
+                if (it != preferredLevel) log.info("detected recipe level h{} (preferred was h{})", it, preferredLevel)
+            } ?: preferredLevel
+        } else {
+            preferredLevel
+        }
+
+        var chunks = splitAtLevel(markdown, effectiveLevel, excludedHeaders)
 
         if (chunks.size < 3) {
-            // Try h1, h3, h4 in order of likely usefulness
-            val fallbacks = listOf(preferredLevel - 1, preferredLevel + 1, preferredLevel + 2)
-                .filter { it in 1..4 }
+            val fallbacks = listOf(effectiveLevel - 1, effectiveLevel + 1, effectiveLevel + 2)
+                .filter { it in 1..5 }
             for (level in fallbacks) {
-                val candidate = splitAtLevel(markdown, level)
+                val candidate = splitAtLevel(markdown, level, excludedHeaders)
                 if (candidate.size > chunks.size) {
-                    log.info("heading level {} produced only {} chunks; using h{} ({} chunks) instead",
-                        preferredLevel, chunks.size, level, candidate.size)
+                    log.info("h{} produced only {} chunks; using h{} ({} chunks) instead",
+                        effectiveLevel, chunks.size, level, candidate.size)
                     chunks = candidate
                     break
                 }
@@ -38,17 +54,39 @@ class MarkdownChunker {
         return mergeShort(chunks, minChunkChars)
     }
 
-    private fun splitAtLevel(markdown: String, level: Int): List<String> {
+    /**
+     * Infer the recipe heading level by finding the first excluded sub-header
+     * (e.g. "### Ingredients" at level 3 → recipes are at level 2).
+     */
+    private fun detectRecipeLevel(markdown: String, excludedHeaders: Set<String>): Int? {
+        val headingLine = Regex("""^(#{1,6}) (.+)""")
+        for (line in markdown.lines()) {
+            val m = headingLine.matchEntire(line.trimEnd()) ?: continue
+            val level = m.groupValues[1].length
+            val title = m.groupValues[2].trim().lowercase()
+            if (excludedHeaders.any { ex -> title == ex || title.startsWith("$ex ") }) {
+                if (level > 1) return level - 1
+            }
+        }
+        return null
+    }
+
+    private fun splitAtLevel(markdown: String, level: Int, excludedHeaders: Set<String> = emptySet()): List<String> {
         val prefix = "#".repeat(level) + " "
-        // A line is a boundary only if it starts exactly at this level (not a sub-heading).
         val lines = markdown.lines()
         val segments = mutableListOf<MutableList<String>>()
         var current = mutableListOf<String>()
 
         for (line in lines) {
             if (line.startsWith(prefix) && !line.startsWith(prefix + "#")) {
-                if (current.any { it.isNotBlank() }) segments.add(current)
-                current = mutableListOf(line)
+                val title = line.removePrefix(prefix).trim().lowercase()
+                val excluded = excludedHeaders.any { ex -> title == ex || title.startsWith("$ex ") }
+                if (excluded) {
+                    current.add(line)
+                } else {
+                    if (current.any { it.isNotBlank() }) segments.add(current)
+                    current = mutableListOf(line)
+                }
             } else {
                 current.add(line)
             }
