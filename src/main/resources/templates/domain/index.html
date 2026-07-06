@@ -145,5 +145,20 @@
     </nav>
 
 </div>
+
+<script>
+(function () {
+    function syncVariant(strategySelect) {
+        var form = strategySelect.closest('form');
+        var variantSelect = form && form.querySelector('select[name="structuralVariant"]');
+        if (!variantSelect) return;
+        variantSelect.disabled = strategySelect.value !== 'STRUCTURAL';
+    }
+    document.querySelectorAll('select[name="chunkStrategy"]').forEach(function (sel) {
+        syncVariant(sel);
+        sel.addEventListener('change', function () { syncVariant(sel); });
+    });
+}());
+</script>
 </body>
 </html>
