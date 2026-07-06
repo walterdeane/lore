@@ -18,7 +18,7 @@ class StructuralTextSplitter {
     private val log = LoggerFactory.getLogger(StructuralTextSplitter::class.java)
 
     companion object {
-        // Matches "1 Title", "1.1 Title", "2.3.1 Title" — numbered section headings
+        // "1 Title", "1.1 Title", "2.3.1 Title"
         private val NUMBERED_SECTION = Regex("""^\d+(\.\d+)*\.?\s+[A-ZÀ-ÿ]""")
 
         fun configFor(variant: StructuralVariant): BoundaryConfig = when (variant) {
@@ -39,8 +39,6 @@ class StructuralTextSplitter {
                 maxTitleLength = 120,
                 minChunkChars = 300,
                 allowNumberedSections = true,
-                // academic section names (Abstract, Introduction, etc.) are valid
-                // boundaries, not exclusions — leave excludedHeaders empty
                 excludedHeaders = emptySet(),
             )
         }
@@ -48,14 +46,44 @@ class StructuralTextSplitter {
 
     fun split(pages: List<Document>, variant: StructuralVariant = StructuralVariant.GENERIC): List<Document> {
         val config = configFor(variant)
-        val fullText = pages.joinToString("\n\n") { it.text ?: "" }
-        val lines = fullText.lines()
+        // Process each Tika page independently so page boundaries are always structural breaks,
+        // then detect heading boundaries within each page's text.
+        val rawSegments = mutableListOf<String>()
+        for (page in pages) {
+            val text = (page.text ?: "").trim()
+            if (text.isBlank()) continue
+            rawSegments.addAll(segmentPage(text.lines(), config))
+        }
 
+        val merged = mergeShortChunks(rawSegments, config.minChunkChars)
+        log.info("[{}] structural split: {} Tika pages → {} raw segments → {} chunks after merge",
+            variant, pages.size, rawSegments.size, merged.size)
+
+        return merged.filter { it.isNotBlank() }.map { Document(it) }
+    }
+
+    private fun segmentPage(lines: List<String>, config: BoundaryConfig): List<String> {
         val segments = mutableListOf<MutableList<String>>()
         var current = mutableListOf<String>()
+        var seenContent = false
 
         for (i in lines.indices) {
-            if (isBoundary(lines[i], lines, i, config)) {
+            val trimmed = lines[i].trim()
+
+            val boundary = when {
+                // First non-blank line of this Tika page: treat as boundary candidate
+                // without needing context (page boundary is itself a structural signal).
+                !seenContent && trimmed.isNotBlank() -> {
+                    seenContent = true
+                    couldBeHeading(trimmed, config)
+                }
+                else -> {
+                    if (trimmed.isNotBlank()) seenContent = true
+                    isHeadingInContext(trimmed, lines, i, config)
+                }
+            }
+
+            if (boundary) {
                 if (current.any { it.isNotBlank() }) segments.add(current)
                 current = mutableListOf(lines[i])
             } else {
@@ -63,52 +91,48 @@ class StructuralTextSplitter {
             }
         }
         if (current.any { it.isNotBlank() }) segments.add(current)
-
-        val merged = mergeShortSegments(segments, config.minChunkChars)
-        log.info("[{}] structural split: {} boundaries, {} chunks after merge",
-            variant, segments.size, merged.size)
-
-        return merged
-            .map { it.joinToString("\n").trim() }
-            .filter { it.isNotBlank() }
-            .map { Document(it) }
+        return segments.map { it.joinToString("\n").trim() }.filter { it.isNotBlank() }
     }
 
-    private fun isBoundary(line: String, lines: List<String>, index: Int, config: BoundaryConfig): Boolean {
-        val trimmed = line.trim()
-
+    // Basic shape check — no context required.
+    private fun couldBeHeading(trimmed: String, config: BoundaryConfig): Boolean {
         if (trimmed.length < 3 || trimmed.length > config.maxTitleLength) return false
+        // Headings don't end like sentences or list items.
         if (trimmed.endsWith(".") || trimmed.endsWith(",") || trimmed.endsWith(";") || trimmed.endsWith(":")) return false
-
         val lower = trimmed.lowercase()
         if (lower in config.excludedHeaders) return false
         if (config.excludedHeaders.any { lower.startsWith(it) }) return false
-
         val isNumbered = config.allowNumberedSections && NUMBERED_SECTION.containsMatchIn(trimmed)
-        if (!isNumbered && !trimmed[0].isUpperCase()) return false
-
-        // Must be preceded by a blank line
-        val prevBlank = index == 0 || lines[index - 1].isBlank()
-        if (!prevBlank) return false
-
-        // Must be immediately followed by content
-        val nextLine = if (index + 1 < lines.size) lines[index + 1].trim() else ""
-        if (nextLine.isBlank()) return false
-
-        return true
+        return isNumbered || trimmed[0].isUpperCase()
     }
 
-    private fun mergeShortSegments(segments: List<MutableList<String>>, minChars: Int): List<List<String>> {
-        if (segments.isEmpty()) return emptyList()
-        val result = mutableListOf<MutableList<String>>()
-        var acc = segments[0].toMutableList()
+    // Context-aware check: the line must pass couldBeHeading AND be preceded by
+    // a blank line OR a sentence-ending line (e.g. the last instruction of a recipe).
+    private fun isHeadingInContext(trimmed: String, lines: List<String>, index: Int, config: BoundaryConfig): Boolean {
+        if (!couldBeHeading(trimmed, config)) return false
 
+        val prevLine = if (index > 0) lines[index - 1].trim() else ""
+
+        // Classic signal: blank line before the heading.
+        if (prevLine.isBlank()) return true
+
+        // Sentence-end signal: previous line closes a paragraph/instruction.
+        // Minimum length guard avoids single-word lines triggering this.
+        val prevEndsSentence = prevLine.length >= 20 &&
+            (prevLine.endsWith(".") || prevLine.endsWith("!") || prevLine.endsWith("?"))
+        return prevEndsSentence
+    }
+
+    private fun mergeShortChunks(segments: List<String>, minChars: Int): List<String> {
+        if (segments.isEmpty()) return emptyList()
+        val result = mutableListOf<String>()
+        var acc = segments[0]
         for (i in 1 until segments.size) {
-            if (acc.joinToString("").trim().length < minChars) {
-                acc.addAll(segments[i])
+            if (acc.trim().length < minChars) {
+                acc = "$acc\n\n${segments[i]}"
             } else {
                 result.add(acc)
-                acc = segments[i].toMutableList()
+                acc = segments[i]
             }
         }
         result.add(acc)
