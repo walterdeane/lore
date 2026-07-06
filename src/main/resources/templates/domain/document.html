@@ -15,12 +15,18 @@
 
     <div class="page-header">
         <h1 th:text="${document.title}">Document name</h1>
-        <form th:action="@{/domains/{id}/documents/{documentId}(id=${domain.id}, documentId=${document.id})}"
-              method="post" class="inline-form"
-              onsubmit="return confirm('Delete this document? This action cannot be undone.');">
-            <input type="hidden" name="_method" value="delete">
-            <button type="submit" class="btn btn-danger">Delete</button>
-        </form>
+        <div class="page-header-actions">
+            <form th:action="@{/domains/{id}/documents/{documentId}/reingest(id=${domain.id}, documentId=${document.id})}"
+                  method="post" class="inline-form">
+                <button type="submit" class="btn btn-secondary">Reingest</button>
+            </form>
+            <form th:action="@{/domains/{id}/documents/{documentId}(id=${domain.id}, documentId=${document.id})}"
+                  method="post" class="inline-form"
+                  onsubmit="return confirm('Delete this document and all its chunks? This cannot be undone.');">
+                <input type="hidden" name="_method" value="delete">
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </div>
     </div>
 
     <section>
@@ -28,6 +34,7 @@
             <div class="document-meta">
                 <span class="document-pill" th:text="${document.sourceType}">Source Type</span>
                 <span class="document-pill" th:text="${document.ingestionStatus}">Ingestion Status</span>
+                <span class="document-pill" th:text="'Strategy: ' + (${document.chunkStrategy} ?: 'domain default')">Strategy</span>
                 <span class="document-pill document-pill-error"
                       th:if="${document.ingestionError}"
                       th:text="${document.ingestionError}">Ingestion Error</span>

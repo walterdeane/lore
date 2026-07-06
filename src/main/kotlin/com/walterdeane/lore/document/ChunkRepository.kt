@@ -12,6 +12,10 @@ import java.util.UUID
 @Repository
 class ChunkRepository(private val jdbcTemplate: JdbcTemplate) {
 
+    fun deleteByDocumentId(documentId: UUID) {
+        jdbcTemplate.update("DELETE FROM chunk WHERE document_id = ?", documentId)
+    }
+
     fun findById(id: UUID): Chunk? =
         jdbcTemplate.query(
             """SELECT id, document_id, domain_id, tag_paths, content, chunk_index,

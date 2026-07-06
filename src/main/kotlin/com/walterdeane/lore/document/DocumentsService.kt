@@ -16,6 +16,7 @@ import java.util.UUID
 class DocumentsService(
     private val documentStorageProperties: DocumentStorageProperties,
     private val documentRepository: DocumentRepository,
+    private val chunkRepository: ChunkRepository,
     private val documentIngestionService: DocumentIngestionService,
 ) {
 
@@ -32,7 +33,16 @@ class DocumentsService(
     }
 
     fun deleteDocument(id: UUID) {
-        documentRepository.deleteById(id)
+        val document = documentRepository.findById(id)
+        documentRepository.deleteById(id) // cascades chunks via FK
+        document?.let { File(it.sourcePath).takeIf { f -> f.exists() }?.delete() }
+    }
+
+    fun reingestDocument(id: UUID) {
+        val document = documentRepository.findById(id) ?: return
+        chunkRepository.deleteByDocumentId(id)
+        documentRepository.updateStatus(id, IngestionStatus.PENDING)
+        documentIngestionService.ingest(document)
     }
 
     fun getAvailableTags(domainId: UUID): List<String> = emptyList()

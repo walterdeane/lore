@@ -69,6 +69,17 @@ class DocumentsViewController(
         return "redirect:/domains/$domainId/documents/${document.id}"
     }
 
+    @PostMapping("/domains/{domainId}/documents/{documentId}/reingest")
+    fun reingestDocument(
+        @PathVariable domainId: UUID,
+        @PathVariable documentId: UUID,
+        redirectAttributes: RedirectAttributes,
+    ): String {
+        documentsService.reingestDocument(documentId)
+        redirectAttributes.addFlashAttribute("message", "Reingestion started")
+        return "redirect:/domains/$domainId/documents/$documentId"
+    }
+
     @DeleteMapping("/domains/{domainId}/documents/{documentId}")
     fun deleteDocument(
         @PathVariable domainId: UUID,

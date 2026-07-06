@@ -360,6 +360,11 @@ h1, h2, h3 {
     display: inline;
 }
 
+.page-header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
 .tags-table {
     width: 100%;
     border-collapse: collapse;
