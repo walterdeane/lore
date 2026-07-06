@@ -19,7 +19,6 @@
             </div>
             <div class="search-filters">
                 <select name="domainId" required onchange="this.form.submit()">
-                    <option value="" disabled th:selected="${domainId == null}">Select a domain…</option>
                     <option th:each="domain : ${domains}"
                             th:value="${domain.id}"
                             th:text="${domain.name}"

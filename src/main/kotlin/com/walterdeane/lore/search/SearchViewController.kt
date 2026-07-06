@@ -34,20 +34,22 @@ class SearchViewController(
         model: Model,
     ): String {
         val selectedTags = tags?.filter { it.isNotBlank() } ?: emptyList()
+        val domains = domainsService.getAllDomains()
+        val effectiveDomainId = domainId ?: domains.firstOrNull()?.id
 
-        model.addAttribute("domains", domainsService.getAllDomains())
+        model.addAttribute("domains", domains)
         model.addAttribute("q", q)
-        model.addAttribute("domainId", domainId)
+        model.addAttribute("domainId", effectiveDomainId)
         model.addAttribute("selectedTags", selectedTags)
         model.addAttribute("page", page)
         model.addAttribute("size", size)
         model.addAttribute("availableTags",
-            if (domainId != null) tagsService.getDomainTags(domainId).sortedBy { it.path }
+            if (effectiveDomainId != null) tagsService.getDomainTags(effectiveDomainId).sortedBy { it.path }
             else emptyList<Any>()
         )
 
-        if (!q.isNullOrBlank() && domainId != null) {
-            model.addAttribute("searchPage", bm25SearchService.search(q, domainId, selectedTags.ifEmpty { null }, size, page))
+        if (!q.isNullOrBlank() && effectiveDomainId != null) {
+            model.addAttribute("searchPage", bm25SearchService.search(q, effectiveDomainId, selectedTags.ifEmpty { null }, size, page))
         }
 
         return "search/index"
