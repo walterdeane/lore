@@ -2,6 +2,7 @@ package com.walterdeane.lore.search
 
 import com.walterdeane.lore.document.ChunkRepository
 import com.walterdeane.lore.document.DocumentsService
+import com.walterdeane.lore.document.MarkdownRenderer
 import com.walterdeane.lore.domain.DomainsService
 import org.springframework.stereotype.Controller
 import org.springframework.ui.Model
@@ -18,6 +19,7 @@ class SearchViewController(
     private val domainsService: DomainsService,
     private val chunkRepository: ChunkRepository,
     private val documentsService: DocumentsService,
+    private val markdownRenderer: MarkdownRenderer,
 ) {
 
     @GetMapping
@@ -53,6 +55,7 @@ class SearchViewController(
         val chunk = chunkRepository.findById(chunkId)
         model.addAttribute("chunk", chunk)
         model.addAttribute("document", chunk?.let { documentsService.getDocumentById(it.documentId) })
+        model.addAttribute("contentHtml", chunk?.let { markdownRenderer.toHtml(it.content) } ?: "")
         model.addAttribute("q", q)
         return "search/chunk"
     }

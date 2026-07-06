@@ -85,7 +85,7 @@
 
         <section class="card">
             <h2>Content</h2>
-            <pre class="chunk-content" th:text="${chunk.content}">chunk text</pre>
+            <div class="chunk-content markdown-body" th:utext="${contentHtml}">chunk text</div>
         </section>
     </div>
 

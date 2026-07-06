@@ -48,7 +48,7 @@ class DocumentIngestionService(
                 ChunkingStrategy.STRUCTURAL -> {
                     val variant = chunkingStrategyResolver.resolveVariant(document, domain)
                     log.info("[{}] STRUCTURAL variant: {}", document.id, variant)
-                    structuralTextSplitter.split(pages, variant)
+                    structuralTextSplitter.split(document.sourcePath, document.sourceType, pages, variant)
                 }
                 ChunkingStrategy.SEMANTIC -> {
                     log.warn("[{}] SEMANTIC strategy not yet implemented, falling back to TOKEN", document.id)

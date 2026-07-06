@@ -1,5 +1,6 @@
 package com.walterdeane.lore.document
 
+import com.walterdeane.lore.model.SourceType
 import com.walterdeane.lore.model.StructuralVariant
 import org.slf4j.LoggerFactory
 import org.springframework.ai.document.Document
@@ -10,15 +11,20 @@ data class BoundaryConfig(
     val minChunkChars: Int = 200,
     val allowNumberedSections: Boolean = true,
     val excludedHeaders: Set<String> = emptySet(),
+    // Preferred markdown heading level to split on (## = 2).
+    val markdownHeadingLevel: Int = 2,
 )
 
 @Component
-class StructuralTextSplitter {
+class StructuralTextSplitter(
+    private val epubMarkdownParser: EpubMarkdownParser,
+    private val pdfMarkdownParser: PdfMarkdownParser,
+    private val markdownChunker: MarkdownChunker,
+) {
 
     private val log = LoggerFactory.getLogger(StructuralTextSplitter::class.java)
 
     companion object {
-        // "1 Title", "1.1 Title", "2.3.1 Title"
         private val NUMBERED_SECTION = Regex("""^\d+(\.\d+)*\.?\s+[A-ZÀ-ÿ]""")
 
         fun configFor(variant: StructuralVariant): BoundaryConfig = when (variant) {
@@ -27,6 +33,7 @@ class StructuralTextSplitter {
             )
             StructuralVariant.COOKBOOK -> BoundaryConfig(
                 allowNumberedSections = false,
+                markdownHeadingLevel = 2,
                 excludedHeaders = setOf(
                     "ingredients", "instructions", "directions", "method", "methods",
                     "notes", "note", "preparation", "serves", "makes", "servings",
@@ -39,26 +46,51 @@ class StructuralTextSplitter {
                 maxTitleLength = 120,
                 minChunkChars = 300,
                 allowNumberedSections = true,
+                markdownHeadingLevel = 2,
                 excludedHeaders = emptySet(),
             )
         }
     }
 
-    fun split(pages: List<Document>, variant: StructuralVariant = StructuralVariant.GENERIC): List<Document> {
+    /**
+     * Primary entry point: parses the source file to markdown then splits on
+     * heading markers. Falls back to heuristic text analysis if parsing fails
+     * or yields fewer than 3 chunks.
+     */
+    fun split(sourcePath: String, sourceType: SourceType, pages: List<Document>, variant: StructuralVariant): List<Document> {
         val config = configFor(variant)
-        // Process each Tika page independently so page boundaries are always structural breaks,
-        // then detect heading boundaries within each page's text.
+
+        val markdown = when (sourceType) {
+            SourceType.EPUB -> epubMarkdownParser.parse(sourcePath)
+            SourceType.PDF -> pdfMarkdownParser.parse(sourcePath)
+        }
+
+        if (markdown.isNotBlank()) {
+            val chunks = markdownChunker.split(markdown, config.markdownHeadingLevel, config.minChunkChars)
+            if (chunks.size >= 3) {
+                log.info("[{}] markdown chunking: {} chunks from {}", variant, chunks.size, sourceType)
+                return chunks.map { Document(it) }
+            }
+            log.warn("[{}] markdown chunking produced only {} chunks for {}, falling back to heuristic",
+                variant, chunks.size, sourceType)
+        } else {
+            log.warn("[{}] markdown parser returned empty for {}, falling back to heuristic", variant, sourceType)
+        }
+
+        return heuristicSplit(pages, variant, config)
+    }
+
+    // Legacy heuristic path — used as fallback when markdown parsing fails.
+    private fun heuristicSplit(pages: List<Document>, variant: StructuralVariant, config: BoundaryConfig): List<Document> {
         val rawSegments = mutableListOf<String>()
         for (page in pages) {
             val text = (page.text ?: "").trim()
             if (text.isBlank()) continue
             rawSegments.addAll(segmentPage(text.lines(), config))
         }
-
-        val merged = mergeShortChunks(rawSegments, config.minChunkChars)
-        log.info("[{}] structural split: {} Tika pages → {} raw segments → {} chunks after merge",
+        val merged = mergeShort(rawSegments, config.minChunkChars)
+        log.info("[{}] heuristic split: {} pages → {} raw → {} chunks",
             variant, pages.size, rawSegments.size, merged.size)
-
         return merged.filter { it.isNotBlank() }.map { Document(it) }
     }
 
@@ -69,20 +101,10 @@ class StructuralTextSplitter {
 
         for (i in lines.indices) {
             val trimmed = lines[i].trim()
-
             val boundary = when {
-                // First non-blank line of this Tika page: treat as boundary candidate
-                // without needing context (page boundary is itself a structural signal).
-                !seenContent && trimmed.isNotBlank() -> {
-                    seenContent = true
-                    couldBeHeading(trimmed, config)
-                }
-                else -> {
-                    if (trimmed.isNotBlank()) seenContent = true
-                    isHeadingInContext(trimmed, lines, i, config)
-                }
+                !seenContent && trimmed.isNotBlank() -> { seenContent = true; couldBeHeading(trimmed, config) }
+                else -> { if (trimmed.isNotBlank()) seenContent = true; isHeadingInContext(trimmed, lines, i, config) }
             }
-
             if (boundary) {
                 if (current.any { it.isNotBlank() }) segments.add(current)
                 current = mutableListOf(lines[i])
@@ -94,10 +116,8 @@ class StructuralTextSplitter {
         return segments.map { it.joinToString("\n").trim() }.filter { it.isNotBlank() }
     }
 
-    // Basic shape check — no context required.
     private fun couldBeHeading(trimmed: String, config: BoundaryConfig): Boolean {
         if (trimmed.length < 3 || trimmed.length > config.maxTitleLength) return false
-        // Headings don't end like sentences or list items.
         if (trimmed.endsWith(".") || trimmed.endsWith(",") || trimmed.endsWith(";") || trimmed.endsWith(":")) return false
         val lower = trimmed.lowercase()
         if (lower in config.excludedHeaders) return false
@@ -106,34 +126,21 @@ class StructuralTextSplitter {
         return isNumbered || trimmed[0].isUpperCase()
     }
 
-    // Context-aware check: the line must pass couldBeHeading AND be preceded by
-    // a blank line OR a sentence-ending line (e.g. the last instruction of a recipe).
     private fun isHeadingInContext(trimmed: String, lines: List<String>, index: Int, config: BoundaryConfig): Boolean {
         if (!couldBeHeading(trimmed, config)) return false
-
         val prevLine = if (index > 0) lines[index - 1].trim() else ""
-
-        // Classic signal: blank line before the heading.
         if (prevLine.isBlank()) return true
-
-        // Sentence-end signal: previous line closes a paragraph/instruction.
-        // Minimum length guard avoids single-word lines triggering this.
         val prevEndsSentence = prevLine.length >= 20 &&
             (prevLine.endsWith(".") || prevLine.endsWith("!") || prevLine.endsWith("?"))
         return prevEndsSentence
     }
 
-    private fun mergeShortChunks(segments: List<String>, minChars: Int): List<String> {
+    private fun mergeShort(segments: List<String>, minChars: Int): List<String> {
         if (segments.isEmpty()) return emptyList()
         val result = mutableListOf<String>()
         var acc = segments[0]
         for (i in 1 until segments.size) {
-            if (acc.trim().length < minChars) {
-                acc = "$acc\n\n${segments[i]}"
-            } else {
-                result.add(acc)
-                acc = segments[i]
-            }
+            acc = if (acc.trim().length < minChars) "$acc\n\n${segments[i]}" else { result.add(acc); segments[i] }
         }
         result.add(acc)
         return result
