@@ -19,9 +19,9 @@
         <form th:action="@{/domains/{id}/documents(id=${domain.id})}" method="post" class="document-form"  enctype="multipart/form-data">
             <input type="text" name="title" placeholder="Title" required>
             <input type="text" name="author" placeholder="Author">
-                    <select name="tags" multiple required>
+                    <select name="tags" multiple>
                         <option th:each="tag : ${availableTags}"
-                                th:value="${tag.id}"
+                                th:value="${tag.path}"
                                 th:text="${tag.path}">
                         </option>
                     </select>

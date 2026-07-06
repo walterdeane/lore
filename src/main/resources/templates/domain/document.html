@@ -73,11 +73,11 @@
                 <form th:action="@{/domains/{id}/documents/{documentId}/tags(id=${domain.id}, documentId=${document.id})}"
                       method="post" class="document-form">
                     <input type="hidden" name="_method" value="put">
-                    <select name="tags" multiple required>
+                    <select name="tags" multiple>
                         <option th:each="tag : ${availableTags}"
-                                th:value="${tag.id}"
+                                th:value="${tag.path}"
                                 th:text="${tag.path}"
-                                th:selected="${document.tags.contains(tag)}">
+                                th:selected="${document.tags.contains(tag.path)}">
                         </option>
                     </select>
                     <button type="submit" class="btn">Save</button>
