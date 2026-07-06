@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Home</title>
+</head>
+<body>
+<div layout:fragment="content">
+
+    <div class="home-hero">
+        <span class="home-hero-mark">&#9670;</span>
+        <h1 class="home-hero-title">Your knowledge, queryable.</h1>
+        <p class="home-hero-sub">
+            Lore ingests documents into a local knowledge base and lets you search them
+            with full-text keyword search or semantic vector search — no cloud required.
+        </p>
+        <a th:href="@{/domains}" class="btn">Go to Domains</a>
+    </div>
+
+    <div class="home-steps">
+        <div class="home-step card">
+            <div class="home-step-number">1</div>
+            <h3>Create a Domain</h3>
+            <p class="text-dim">
+                A domain is a named knowledge area — <em>Cookbooks</em>, <em>Gardening</em>,
+                <em>Brewing</em>. Everything you ingest lives inside one.
+            </p>
+            <a th:href="@{/domains}" class="btn btn-secondary">Manage Domains</a>
+        </div>
+
+        <div class="home-step card">
+            <div class="home-step-number">2</div>
+            <h3>Upload Documents</h3>
+            <p class="text-dim">
+                Upload PDFs or EPUBs into a domain. Lore extracts text, splits it into chunks,
+                and stores vector embeddings alongside a full-text search index.
+            </p>
+            <a th:href="@{/domains}" class="btn btn-secondary">Browse Domains</a>
+        </div>
+
+        <div class="home-step card">
+            <div class="home-step-number">3</div>
+            <h3>Search</h3>
+            <p class="text-dim">
+                Run keyword search (BM25) without any LLM, or use hybrid search with
+                vector retrieval and reranking to ask natural-language questions.
+            </p>
+            <a th:href="@{/query}" class="btn btn-secondary">Ask a Question</a>
+        </div>
+    </div>
+
+    <section class="card home-concepts">
+        <h2>How it works</h2>
+        <dl class="concept-list">
+            <div class="concept-item">
+                <dt>Domain</dt>
+                <dd>Top-level organizer. Groups documents by theme and sets the default chunking strategy for ingestion.</dd>
+            </div>
+            <div class="concept-item">
+                <dt>Document</dt>
+                <dd>A source file (PDF or EPUB) inside a domain. Tracks ingestion status and the tags assigned at upload time.</dd>
+            </div>
+            <div class="concept-item">
+                <dt>Tag</dt>
+                <dd>A domain-scoped hierarchical label like <code>cuisine.italian</code> or <code>technique.fermentation</code>. Chunks inherit the tags of their document for filtered retrieval.</dd>
+            </div>
+            <div class="concept-item">
+                <dt>Chunk</dt>
+                <dd>A text segment produced during ingestion. Each chunk stores a vector embedding, a full-text search index, and denormalized domain and tag metadata so searches need no joins.</dd>
+            </div>
+            <div class="concept-item">
+                <dt>Chunking Strategy</dt>
+                <dd>Controls how documents are split. <strong>Token</strong> splits by token count. <strong>Semantic</strong> splits on meaning shifts. <strong>Structural</strong> uses document structure (e.g. recipe sections). Set a default per domain and override per document.</dd>
+            </div>
+        </dl>
+    </section>
+
+</div>
+</body>
+</html>

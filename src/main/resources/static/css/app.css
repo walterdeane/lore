@@ -430,3 +430,97 @@ details summary {
     color: var(--text-dim);
     font-size: 0.85rem;
 }
+
+/* Home page */
+.home-hero {
+    text-align: center;
+    padding: 4rem 1rem 3.5rem;
+}
+
+.home-hero-mark {
+    display: block;
+    font-size: 2.5rem;
+    color: var(--accent);
+    margin-bottom: 1rem;
+}
+
+.home-hero-title {
+    font-size: 2.4rem;
+    letter-spacing: -0.03em;
+    margin: 0 0 1rem;
+}
+
+.home-hero-sub {
+    color: var(--text-dim);
+    max-width: 520px;
+    margin: 0 auto 2rem;
+    line-height: 1.65;
+}
+
+.home-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.home-step {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.home-step h3 {
+    margin: 0;
+}
+
+.home-step p {
+    flex: 1;
+    margin: 0;
+}
+
+.home-step-number {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.home-concepts h2 {
+    margin-top: 0;
+}
+
+.concept-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem 2rem;
+    margin: 0;
+}
+
+.concept-item dt {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+}
+
+.concept-item dd {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    line-height: 1.55;
+}
+
+.concept-item code {
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.82rem;
+    color: var(--accent);
+}
