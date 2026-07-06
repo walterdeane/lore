@@ -33,8 +33,12 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
     }
 
     fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage {
+        // For each selected tag, match chunks whose tag_paths contain that tag or any descendant.
+        // tp <@ ANY(...) is true when tp is a descendant of (or equal to) any element in the array,
+        // so cookbook.cuisine matches cookbook.cuisine.american but not cookbook or cookbook.american.
+        // Multiple selected tags are OR: a chunk matches if any tag_path falls under any selected tag.
         val tagClause = if (!tags.isNullOrEmpty())
-            "AND c.tag_paths && ARRAY[${tags.joinToString(",") { "?" }}]::ltree[]"
+            "AND EXISTS (SELECT 1 FROM unnest(c.tag_paths) AS tp WHERE tp <@ ANY(ARRAY[${tags.joinToString(",") { "?" }}]::ltree[]))"
         else ""
 
         val sql = """
