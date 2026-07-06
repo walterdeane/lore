@@ -31,6 +31,7 @@ class DocumentsService(
 
     fun updateDocumentTags(id: UUID, tags: List<String>) {
         documentRepository.updateTags(id, tags)
+        chunkRepository.updateTagPathsByDocumentId(id, tags)
     }
 
     fun deleteDocument(id: UUID) {

@@ -19,9 +19,15 @@
     <section class="card" style="margin-bottom: 1.5rem;">
         <h2>Add a tag</h2>
         <form th:action="@{/domains/{id}/tags(id=${domain.id})}" method="post" class="tag-form">
-            <input type="text" name="name" placeholder="Name" required>
+            <select name="parentPath">
+                <option value="">— root level —</option>
+                <option th:each="tag : ${availableTags}"
+                        th:value="${tag.path}"
+                        th:text="${tag.path} + ' (' + ${tag.name} + ')'">
+                </option>
+            </select>
+            <input type="text" name="name" placeholder="Tag name" required>
             <input type="text" name="description" placeholder="Description">
-            <input type="text" name="path" placeholder="e.g. cuisine.italian.northern" required>
             <button type="submit" class="btn">Add tag</button>
         </form>
     </section>

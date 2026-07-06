@@ -16,6 +16,13 @@ class ChunkRepository(private val jdbcTemplate: JdbcTemplate) {
         jdbcTemplate.update("DELETE FROM chunk WHERE document_id = ?", documentId)
     }
 
+    fun updateTagPathsByDocumentId(documentId: UUID, tagPaths: List<String>) {
+        jdbcTemplate.update("UPDATE chunk SET tag_paths = ? WHERE document_id = ?") { ps ->
+            ps.setArray(1, ps.connection.createArrayOf("ltree", tagPaths.toTypedArray()))
+            ps.setObject(2, documentId)
+        }
+    }
+
     fun findById(id: UUID): Chunk? =
         jdbcTemplate.query(
             """SELECT id, document_id, domain_id, tag_paths, content, chunk_index,

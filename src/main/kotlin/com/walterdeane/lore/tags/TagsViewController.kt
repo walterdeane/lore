@@ -26,20 +26,23 @@ class TagsViewController(val tagsService: TagsService, val domainsService: Domai
     ): String {
         model.addAttribute("domain", domainsService.getDomainById(id))
         model.addAttribute("tagTree", tagsService.getTagTree(id, q))
+        model.addAttribute("availableTags", tagsService.getDomainTags(id).sortedBy { it.path })
         model.addAttribute("query", q)
         return "domain/tags"
     }
 
     @PostMapping("/domains/{id}/tags")
     fun createTag(@PathVariable id: UUID, @ModelAttribute tag: TagForm, redirectAttributes: RedirectAttributes): String {
+        val slug = tag.name.trim().lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
+        val path = if (tag.parentPath.isBlank()) slug else "${tag.parentPath}.$slug"
         tagsService.createTag(Tag(
             id = UUID.randomUUID(),
             domainId = id,
-            name = tag.name,
+            name = tag.name.trim(),
             description = tag.description,
-            path = tag.path
+            path = path,
         ))
-        redirectAttributes.addFlashAttribute("message", "Tag created successfully")
+        redirectAttributes.addFlashAttribute("message", "Tag '${tag.name.trim()}' created at path '$path'")
         return "redirect:/domains/$id/tags"
     }
 
@@ -75,4 +78,9 @@ class TagsViewController(val tagsService: TagsService, val domainsService: Domai
 
 }
 
-data class TagForm(val name: String, val description: String, val path: String)
+data class TagForm(
+    val name: String = "",
+    val description: String = "",
+    val parentPath: String = "",
+    val path: String = "",   // still submitted by the edit row (readonly), ignored by update SQL
+)
