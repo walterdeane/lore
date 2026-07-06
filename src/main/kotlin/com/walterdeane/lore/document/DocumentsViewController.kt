@@ -3,9 +3,14 @@ package com.walterdeane.lore.document
 import com.walterdeane.lore.domain.DomainsService
 import com.walterdeane.lore.model.ChunkingStrategy
 import com.walterdeane.lore.tags.TagsService
+import org.springframework.core.io.FileSystemResource
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PageableDefault
+import org.springframework.http.ContentDisposition
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE
+import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
 import org.springframework.ui.Model
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -17,6 +22,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.servlet.mvc.support.RedirectAttributes
+import java.io.File
 import java.util.UUID
 
 @Controller
@@ -47,9 +53,11 @@ class DocumentsViewController(
         @PathVariable documentId: UUID,
         model: Model,
     ): String {
+        val availableTags = tagsService.getDomainTags(domainId)
         model.addAttribute("domain", domainsService.getDomainById(domainId))
         model.addAttribute("document", documentsService.getDocumentById(documentId))
-        model.addAttribute("availableTags", tagsService.getDomainTags(domainId))
+        model.addAttribute("availableTags", availableTags)
+        model.addAttribute("tagsByPath", availableTags.associateBy { it.path })
         return "domain/document"
     }
 
@@ -67,6 +75,29 @@ class DocumentsViewController(
             domainId, file.originalFilename ?: "untitled", file.bytes, title, author, tags ?: emptyList(), strategy
         )
         return "redirect:/domains/$domainId/documents/${document.id}"
+    }
+
+    @GetMapping("/domains/{domainId}/documents/{documentId}/file")
+    fun serveFile(
+        @PathVariable domainId: UUID,
+        @PathVariable documentId: UUID,
+    ): ResponseEntity<FileSystemResource> {
+        val document = documentsService.getDocumentById(documentId)
+            ?: return ResponseEntity.notFound().build()
+        val file = File(document.sourcePath)
+        if (!file.exists()) return ResponseEntity.notFound().build()
+
+        val mediaType = when (document.sourceType) {
+            com.walterdeane.lore.model.SourceType.PDF -> MediaType.APPLICATION_PDF
+            com.walterdeane.lore.model.SourceType.EPUB -> MediaType.parseMediaType("application/epub+zip")
+        }
+        val headers = HttpHeaders().apply {
+            contentType = mediaType
+            contentDisposition = ContentDisposition.inline()
+                .filename(document.sourceFilename)
+                .build()
+        }
+        return ResponseEntity.ok().headers(headers).body(FileSystemResource(file))
     }
 
     @PostMapping("/domains/{domainId}/documents/{documentId}/reingest")

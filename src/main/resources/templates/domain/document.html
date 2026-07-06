@@ -43,7 +43,11 @@
             <dl class="meta-list">
                 <div class="meta-item">
                     <dt>Source Filename</dt>
-                    <dd th:text="${document.sourceFilename}">filename</dd>
+                    <dd>
+                        <a th:href="@{/domains/{d}/documents/{doc}/file(d=${domain.id}, doc=${document.id})}"
+                           th:text="${document.sourceFilename}"
+                           target="_blank">filename</a>
+                    </dd>
                 </div>
                 <div class="meta-item">
                     <dt>Ingested At</dt>
@@ -52,7 +56,8 @@
                 <div class="meta-item" th:if="${not document.tags.isEmpty()}">
                     <dt>Tags</dt>
                     <dd>
-                        <span class="tag-pill" th:each="tag : ${document.tags}" th:text="${tag}">tag</span>
+                        <span class="tag-pill" th:each="tagPath : ${document.tags}"
+                              th:text="${tagsByPath[tagPath] != null ? tagsByPath[tagPath].name : tagPath}">tag</span>
                     </dd>
                 </div>
             </dl>
@@ -83,7 +88,7 @@
                     <select name="tags" multiple>
                         <option th:each="tag : ${availableTags}"
                                 th:value="${tag.path}"
-                                th:text="${tag.path}"
+                                th:text="${tag.name}"
                                 th:selected="${document.tags.contains(tag.path)}">
                         </option>
                     </select>

@@ -22,7 +22,7 @@
                     <select name="tags" multiple>
                         <option th:each="tag : ${availableTags}"
                                 th:value="${tag.path}"
-                                th:text="${tag.path}">
+                                th:text="${tag.name}">
                         </option>
                     </select>
             <select name="chunkStrategy">

@@ -76,7 +76,8 @@
                 <div class="meta-item" th:if="${not chunk.tagPaths.isEmpty()}">
                     <dt>Tags</dt>
                     <dd>
-                        <span class="tag-pill" th:each="tag : ${chunk.tagPaths}" th:text="${tag}">tag</span>
+                        <span class="tag-pill" th:each="tag : ${chunk.tagPaths}"
+                              th:text="${tag.contains('.') ? tag.substring(tag.lastIndexOf('.') + 1) : tag}">tag</span>
                     </dd>
                 </div>
             </dl>
