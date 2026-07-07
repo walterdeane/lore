@@ -72,14 +72,18 @@ class MarkdownChunker {
     }
 
     private fun splitAtLevel(markdown: String, level: Int, excludedHeaders: Set<String> = emptySet()): List<String> {
-        val prefix = "#".repeat(level) + " "
+        val headingLine = Regex("""^(#{1,6}) (.+)""")
         val lines = markdown.lines()
         val segments = mutableListOf<MutableList<String>>()
         var current = mutableListOf<String>()
 
         for (line in lines) {
-            if (line.startsWith(prefix) && !line.startsWith(prefix + "#")) {
-                val title = line.removePrefix(prefix).trim().lowercase()
+            val m = headingLine.matchEntire(line.trimEnd())
+            // A heading at or shallower than the configured level starts a new chunk
+            // (e.g. a book's h1 chapter/back-matter break must end a chunk even when
+            // splitting at h2 recipe level) — deeper headings stay inside the chunk body.
+            if (m != null && m.groupValues[1].length <= level) {
+                val title = m.groupValues[2].trim().lowercase()
                 val excluded = excludedHeaders.any { ex -> title == ex || title.startsWith("$ex ") }
                 if (excluded) {
                     current.add(line)
