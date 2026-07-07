@@ -684,7 +684,7 @@ details summary {
 .markdown-body h3 { font-size: 1.05rem; }
 .markdown-body p  { margin: 0.6rem 0; }
 .markdown-body ul, .markdown-body ol { padding-left: 1.6rem; margin: 0.5rem 0; }
-.markdown-body li { margin: 0.2rem 0; }
+.markdown-body li { margin: 0.2rem 0; line-height: 1.4; }
 .markdown-body li > p { margin: 0; }
 .markdown-body ol { list-style: decimal; }
 .markdown-body ul { list-style: disc; }
