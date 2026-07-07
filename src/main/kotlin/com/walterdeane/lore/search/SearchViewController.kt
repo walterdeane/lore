@@ -16,7 +16,7 @@ import java.util.UUID
 @Controller
 @RequestMapping("/search")
 class SearchViewController(
-    private val bm25SearchService: BM25SearchService,
+    private val hybridSearchService: HybridSearchService,
     private val domainsService: DomainsService,
     private val tagsService: TagsService,
     private val chunkRepository: ChunkRepository,
@@ -49,7 +49,7 @@ class SearchViewController(
         )
 
         if (!q.isNullOrBlank() && effectiveDomainId != null) {
-            model.addAttribute("searchPage", bm25SearchService.search(q, effectiveDomainId, selectedTags.ifEmpty { null }, size, page))
+            model.addAttribute("searchPage", hybridSearchService.search(q, effectiveDomainId, selectedTags.ifEmpty { null }, size, page))
         }
 
         return "search/index"

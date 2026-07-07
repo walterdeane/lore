@@ -1,12 +1,17 @@
 package com.walterdeane.lore.search
 
 import com.walterdeane.lore.model.ChunkingStrategy
+import org.postgresql.util.PGobject
+import org.springframework.ai.embedding.EmbeddingModel
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import java.util.UUID
 
 @Service
-class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
+class VectorSearchService(
+    private val jdbcTemplate: JdbcTemplate,
+    private val embeddingModel: EmbeddingModel,
+) {
 
     data class Result(
         val chunkId: UUID,
@@ -16,52 +21,41 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
         val chunkStrategy: ChunkingStrategy,
         val tagPaths: List<String>,
         val headline: String,
-        val rank: Double,
+        // 1 - cosine distance; higher means more similar, matching BM25's "higher rank is better" direction.
+        val similarity: Double,
         val documentTitle: String,
         val documentAuthor: String?,
     )
 
-    data class SearchPage(
-        val results: List<Result>,
-        val total: Long,
-        val page: Int,
-        val size: Int,
-    ) {
-        val totalPages: Int get() = if (total == 0L) 1 else ((total + size - 1) / size).toInt()
-        val hasNext: Boolean get() = (page + 1).toLong() * size < total
-        val hasPrevious: Boolean get() = page > 0
-    }
-
-    fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage {
+    fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20): List<Result> {
+        val vectorParam = PGobject().apply {
+            type = "vector"
+            value = embeddingModel.embed(query).joinToString(",", "[", "]")
+        }
         val tagClause = tagFilterClause(tags)
 
         val sql = """
-            SELECT c.id, c.document_id, c.domain_id, c.chunk_index, c.chunk_strategy, c.tag_paths,
-                   ts_rank_cd(c.search_vector, q) AS rank,
-                   ts_headline('english', c.content, q, 'MaxWords=35, MinWords=15') AS headline,
-                   COUNT(*) OVER() AS total_count,
+            SELECT c.id, c.document_id, c.domain_id, c.chunk_index, c.chunk_strategy, c.tag_paths, c.content,
+                   1 - (c.embedding <=> ?) AS similarity,
                    d.title AS document_title, d.author AS document_author
             FROM chunk c
-            JOIN document d ON d.id = c.document_id,
-            plainto_tsquery('english', ?) q
-            WHERE c.search_vector @@ q
-              AND c.domain_id = ?
+            JOIN document d ON d.id = c.document_id
+            WHERE c.domain_id = ?
+              AND c.embedding IS NOT NULL
               $tagClause
-            ORDER BY rank DESC
-            LIMIT ? OFFSET ?
+            ORDER BY c.embedding <=> ?
+            LIMIT ?
         """.trimIndent()
 
         val args = buildList<Any?> {
-            add(query)
+            add(vectorParam)
             add(domainId)
             if (!tags.isNullOrEmpty()) addAll(tags)
+            add(vectorParam)
             add(size)
-            add(page * size)
         }.toTypedArray()
 
-        var total = 0L
-        val results = jdbcTemplate.query(sql, { rs, rowNum ->
-            if (rowNum == 0) total = rs.getLong("total_count")
+        return jdbcTemplate.query(sql, { rs, _ ->
             Result(
                 chunkId = rs.getObject("id", UUID::class.java),
                 documentId = rs.getObject("document_id", UUID::class.java),
@@ -69,13 +63,16 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
                 chunkIndex = rs.getInt("chunk_index"),
                 chunkStrategy = ChunkingStrategy.valueOf(rs.getString("chunk_strategy")),
                 tagPaths = (rs.getArray("tag_paths").array as Array<*>).map { it.toString() },
-                headline = rs.getString("headline"),
-                rank = rs.getDouble("rank"),
+                headline = plainExcerpt(rs.getString("content")),
+                similarity = rs.getDouble("similarity"),
                 documentTitle = rs.getString("document_title"),
                 documentAuthor = rs.getString("document_author"),
             )
         }, *args)
-
-        return SearchPage(results, total, page, size)
     }
+}
+
+internal fun plainExcerpt(content: String, maxLen: Int = 240): String {
+    val stripped = content.trim().replace(Regex("\\s+"), " ")
+    return if (stripped.length <= maxLen) stripped else stripped.take(maxLen).substringBeforeLast(' ') + "…"
 }
