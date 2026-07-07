@@ -1,11 +1,12 @@
 package com.walterdeane.lore
 
+import org.springframework.ai.model.chat.client.autoconfigure.ChatClientAutoConfiguration
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan
 import org.springframework.boot.runApplication
 import org.springframework.scheduling.annotation.EnableAsync
 
-@SpringBootApplication
+@SpringBootApplication(exclude = [ChatClientAutoConfiguration::class])
 @EnableAsync
 @ConfigurationPropertiesScan
 class LoreApplication

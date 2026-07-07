@@ -31,6 +31,7 @@ dependencies {
 	implementation("org.flywaydb:flyway-database-postgresql")
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("org.springframework.ai:spring-ai-starter-model-ollama")
+	implementation("org.springframework.ai:spring-ai-starter-model-anthropic")
 	implementation("org.springframework.ai:spring-ai-starter-vector-store-pgvector")
 	implementation("org.springframework.ai:spring-ai-vector-store-advisor")
 	implementation("org.springframework.ai:spring-ai-tika-document-reader")

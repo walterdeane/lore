@@ -13,8 +13,21 @@ spring:
     ollama:
       embedding:
         model: nomic-embed-text
+      chat:
+        model: llama3.1:8b
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}
+      chat:
+        options:
+          model: claude-haiku-4-5-20251001
 
 lore:
+  chat:
+    # ollama (default, local/free) or anthropic (requires ANTHROPIC_API_KEY)
+    provider: ${LORE_CHAT_PROVIDER:ollama}
+    # LLM-scored reranking of retrieved chunks before building chat context; disable if
+    # the local chat model is too weak/slow to follow the ranking prompt reliably.
+    rerank-enabled: ${LORE_CHAT_RERANK_ENABLED:false}
   storage:
     documents-dir: ${LORE_DOCS_DIR:${LORE_DATA_DIR:${user.home}/lore-data}/documents}
   chunking:

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <title>Chat</title>
+</head>
+<body>
+<div layout:fragment="content">
+
+    <h1>Chat</h1>
+    <p class="text-dim">Answers are grounded in the top matching chunks from the selected domain.</p>
+
+    <section class="card" style="margin-bottom: 1.5rem;">
+        <form th:action="@{/chat}" method="get" class="search-form">
+            <div class="search-row">
+                <input type="text" name="q" placeholder="Ask something…" th:value="${q}" class="search-input" autofocus>
+                <button type="submit" class="btn">Send</button>
+            </div>
+            <div class="search-filters">
+                <select name="domainId" required onchange="this.form.submit()">
+                    <option th:each="domain : ${domains}"
+                            th:value="${domain.id}"
+                            th:text="${domain.name}"
+                            th:selected="${domain.id == domainId}">
+                    </option>
+                </select>
+            </div>
+        </form>
+    </section>
+
+    <section class="card" th:if="${contentHtml != null}">
+        <div class="markdown-body" th:utext="${contentHtml}">answer</div>
+    </section>
+
+    <section class="card" th:if="${sources != null and not sources.isEmpty()}">
+        <h3 style="margin-top:0;">Sources</h3>
+        <ul class="result-list">
+            <li th:each="source : ${sources}">
+                <span th:text="${source.documentTitle}">Title</span>
+                &middot;
+                <a th:href="@{/search/chunks/{id}(id=${source.chunkId}, q=${q})}">view chunk</a>
+            </li>
+        </ul>
+    </section>
+
+</div>
+</body>
+</html>
