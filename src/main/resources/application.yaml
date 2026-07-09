@@ -7,8 +7,8 @@ spring:
         enabled: true
   servlet:
     multipart:
-      max-file-size: 200MB
-      max-request-size: 200MB
+      max-file-size: ${LORE_MAX_UPLOAD_SIZE:1GB}
+      max-request-size: ${LORE_MAX_UPLOAD_SIZE:1GB}
   ai:
     ollama:
       embedding:
@@ -20,6 +20,12 @@ spring:
       chat:
         options:
           model: claude-haiku-4-5-20251001
+
+server:
+  error:
+    # Personal/local tool, not a public multi-tenant service — surfacing the real error message
+    # in the rendered error page (templates/error.html) is more useful here than hiding it.
+    include-message: always
 
 lore:
   chat:
