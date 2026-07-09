@@ -37,6 +37,14 @@ class ChunkRepository(private val jdbcTemplate: JdbcTemplate) {
             id
         ).firstOrNull()
 
+    /** Looks up the chunk immediately before/after a given one in the same document, by [chunkIndex] — for prev/next navigation. */
+    fun findIdByDocumentIdAndChunkIndex(documentId: UUID, chunkIndex: Int): UUID? =
+        jdbcTemplate.query(
+            "SELECT id FROM chunk WHERE document_id = ? AND chunk_index = ?",
+            { rs, _ -> rs.getObject("id", UUID::class.java) },
+            documentId, chunkIndex
+        ).firstOrNull()
+
     private fun mapRow(rs: ResultSet) = Chunk(
         id = rs.getObject("id", UUID::class.java),
         documentId = rs.getObject("document_id", UUID::class.java),

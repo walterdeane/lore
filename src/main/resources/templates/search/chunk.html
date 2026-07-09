@@ -10,7 +10,15 @@
 
     <div class="page-header">
         <h1>Chunk Detail</h1>
-        <a th:href="@{/search(q=${q})}" class="btn btn-secondary">&larr; Back to results</a>
+        <div class="page-header-actions">
+            <a th:if="${previousChunkId != null}"
+               th:href="@{/search/chunks/{id}(id=${previousChunkId}, q=${q})}"
+               class="btn btn-secondary">&larr; Previous chunk</a>
+            <a th:if="${nextChunkId != null}"
+               th:href="@{/search/chunks/{id}(id=${nextChunkId}, q=${q})}"
+               class="btn btn-secondary">Next chunk &rarr;</a>
+            <a th:href="@{/search(q=${q})}" class="btn btn-secondary">Back to results</a>
+        </div>
     </div>
 
     <div th:if="${chunk == null}">

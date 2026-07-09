@@ -73,6 +73,8 @@ class SearchViewController(
         model.addAttribute("document", chunk?.let { documentsService.getDocumentById(it.documentId) })
         model.addAttribute("contentHtml", chunk?.let { markdownRenderer.toHtml(it.content) } ?: "")
         model.addAttribute("q", q)
+        model.addAttribute("previousChunkId", chunk?.let { chunkRepository.findIdByDocumentIdAndChunkIndex(it.documentId, it.chunkIndex - 1) })
+        model.addAttribute("nextChunkId", chunk?.let { chunkRepository.findIdByDocumentIdAndChunkIndex(it.documentId, it.chunkIndex + 1) })
         return "search/chunk"
     }
 }
