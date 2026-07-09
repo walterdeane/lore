@@ -41,7 +41,10 @@ dependencies {
 	implementation("org.springframework.ai:spring-ai-vector-store-advisor")
 	implementation("org.springframework.ai:spring-ai-tika-document-reader")
 	implementation("org.jsoup:jsoup:1.18.3")
-	implementation("org.apache.pdfbox:pdfbox:3.0.3")
+	// Must match the pdfbox version tika-parser-pdf-module (pulled in transitively via
+	// spring-ai-tika-document-reader) actually requests, or Tika's PDF parser breaks at runtime
+	// with NoSuchMethodError — check via `./gradlew dependencyInsight --dependency org.apache.pdfbox:pdfbox`.
+	implementation("org.apache.pdfbox:pdfbox:3.0.7")
 	implementation("org.commonmark:commonmark:0.22.0")
 	implementation("tools.jackson.module:jackson-module-kotlin")
 	implementation("org.springframework.boot:spring-boot-docker-compose")

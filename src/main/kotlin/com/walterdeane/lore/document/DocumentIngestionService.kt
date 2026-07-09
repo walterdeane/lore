@@ -93,7 +93,11 @@ class DocumentIngestionService(
 
             documentRepository.updateStatus(document.id, IngestionStatus.COMPLETED, ingestedAt = Instant.now())
             log.info("[{}] ingestion complete", document.id)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Catches Error too, not just Exception — a classpath/version mismatch surfaces as
+            // something like NoSuchMethodError, which isn't an Exception. Without this, such a
+            // failure never gets recorded: the document sits at PENDING forever with no error
+            // message, since Spring's async executor logs and swallows it instead of propagating.
             log.error("[{}] ingestion failed", document.id, e)
             documentRepository.updateStatus(document.id, IngestionStatus.FAILED, error = e.message)
         }

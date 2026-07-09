@@ -45,6 +45,12 @@ These need a decision before they can be scoped as real work:
 
 ## Recently completed
 
+- **Fixed PDF ingestion.** `NoSuchMethodError: PDF2XHTML.setIgnoreContentStreamSpaceGlyphs` — our
+  explicit `pdfbox:3.0.3` conflicted with the `pdfbox:3.0.7` that `tika-parser-pdf-module:3.3.1`
+  actually requests (confirmed via `./gradlew dependencyInsight --dependency org.apache.pdfbox:pdfbox`).
+  Bumped to `3.0.7` to match. Also: `DocumentIngestionService.ingest`'s catch block only caught
+  `Exception`, not `Error`, so this failure mode left the document stuck at `PENDING` forever with no
+  error recorded instead of marking it `FAILED` — changed to catch `Throwable`.
 - **Replaced the `getDocumentChunks` JSON stub** with a "View chunks" link on the document detail
   page that jumps to chunk index 0, using "nexting" to walk the rest — a better fit now that the
   chunk detail page shows far more than a flat JSON array would. `DocumentsController` deleted
