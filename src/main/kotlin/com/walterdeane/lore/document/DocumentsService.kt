@@ -40,6 +40,9 @@ class DocumentsService(
 
     fun getDocumentById(id: UUID): Document? = documentRepository.findById(id)
 
+    /** Entry point into the chunk detail page's prev/next ("nexting") navigation for this document. */
+    fun getFirstChunkId(documentId: UUID): UUID? = chunkRepository.findIdByDocumentIdAndChunkIndex(documentId, 0)
+
     fun updateDocument(id: UUID, title: String, author: String?, sourcePath: String) {
         documentRepository.update(id, title, author, sourcePath)
     }

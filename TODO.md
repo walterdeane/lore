@@ -31,8 +31,6 @@ These need a decision before they can be scoped as real work:
   Spring context test exist. Nothing covers chunking (`MarkdownChunker`, `StructuralTextSplitter`,
   `TokenOverlapChunker`), ingestion, the reranker's response parsing, or the EPUB zip/folder-bundle
   detection logic in `DocumentsService`.
-- **`DocumentsController.getDocumentChunks`** — intentional stub; no backing query yet
-  (`ChunkRepository` has no `findByDocumentId`).
 
 ## Explicitly deferred (not active work)
 
@@ -47,6 +45,10 @@ These need a decision before they can be scoped as real work:
 
 ## Recently completed
 
+- **Replaced the `getDocumentChunks` JSON stub** with a "View chunks" link on the document detail
+  page that jumps to chunk index 0, using "nexting" to walk the rest — a better fit now that the
+  chunk detail page shows far more than a flat JSON array would. `DocumentsController` deleted
+  entirely (it only ever held that one stub).
 - **"Nexting" — prev/next chunk navigation** on the chunk detail page (`/search/chunks/{id}`), via
   `ChunkRepository.findIdByDocumentIdAndChunkIndex` (no schema changes needed).
 
@@ -74,5 +76,5 @@ These need a decision before they can be scoped as real work:
 - Full server-rendered UI (domains, tags, documents, search, chat) — see PRD.md's API Surface
   section for what replaced the original JSON-API plan.
 - README + `docs/SETUP.md` + `docs/CONFIGURATION.md`.
-- Removed dead code: `QueryController`, most of `DocumentsController`, the unused chunk
-  parent/child hierarchy columns.
+- Removed dead code: `QueryController`, `DocumentsController`, the unused chunk parent/child
+  hierarchy columns.

@@ -16,6 +16,9 @@
     <div class="page-header">
         <h1 th:text="${document.title}">Document name</h1>
         <div class="page-header-actions">
+            <a th:if="${firstChunkId != null}"
+               th:href="@{/search/chunks/{id}(id=${firstChunkId})}"
+               class="btn btn-secondary">View chunks</a>
             <form th:action="@{/domains/{id}/documents/{documentId}/reingest(id=${domain.id}, documentId=${document.id})}"
                   method="post" class="inline-form">
                 <button type="submit" class="btn btn-secondary">Reingest</button>

@@ -61,6 +61,7 @@ class DocumentsViewController(
         model.addAttribute("document", documentsService.getDocumentById(documentId))
         model.addAttribute("availableTags", availableTags)
         model.addAttribute("tagsByPath", availableTags.associateBy { it.path })
+        model.addAttribute("firstChunkId", documentsService.getFirstChunkId(documentId))
         return "domain/document"
     }
 
