@@ -26,6 +26,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes
 import java.io.File
 import java.util.UUID
 
+/** Server-rendered document management UI: list/upload/tag/reingest/delete documents within a domain. */
 @Controller
 class DocumentsViewController(
     private val domainsService: DomainsService,
@@ -63,6 +64,7 @@ class DocumentsViewController(
         return "domain/document"
     }
 
+    /** Accepts an EPUB/PDF upload with optional chunking overrides, then triggers async ingestion (see [DocumentIngestionService]). */
     @PostMapping("/domains/{domainId}/documents", consumes = [MULTIPART_FORM_DATA_VALUE])
     fun uploadDocument(
         @PathVariable domainId: UUID,
