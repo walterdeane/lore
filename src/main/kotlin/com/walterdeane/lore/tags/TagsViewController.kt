@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.servlet.mvc.support.RedirectAttributes
 import com.walterdeane.lore.domain.DomainsService
 import com.walterdeane.lore.model.Tag
+import jakarta.servlet.http.HttpServletRequest
 
+/** CRUD UI for a domain's tag hierarchy, used elsewhere to scope search/chat retrieval. */
 @Controller()
 class TagsViewController(val tagsService: TagsService, val domainsService: DomainsService) {
 
@@ -31,8 +33,9 @@ class TagsViewController(val tagsService: TagsService, val domainsService: Domai
         return "domain/tags"
     }
 
+    /** Also used as a quick-add-tag form on the document upload page, so it returns to whichever page posted to it (via Referer) rather than always jumping to the tags page. */
     @PostMapping("/domains/{id}/tags")
-    fun createTag(@PathVariable id: UUID, @ModelAttribute tag: TagForm, redirectAttributes: RedirectAttributes): String {
+    fun createTag(@PathVariable id: UUID, @ModelAttribute tag: TagForm, request: HttpServletRequest, redirectAttributes: RedirectAttributes): String {
         val slug = tag.name.trim().lowercase().replace(Regex("[^a-z0-9]+"), "_").trim('_')
         val path = if (tag.parentPath.isBlank()) slug else "${tag.parentPath}.$slug"
         tagsService.createTag(Tag(
@@ -43,7 +46,7 @@ class TagsViewController(val tagsService: TagsService, val domainsService: Domai
             path = path,
         ))
         redirectAttributes.addFlashAttribute("message", "Tag '${tag.name.trim()}' created at path '$path'")
-        return "redirect:/domains/$id/tags"
+        return "redirect:" + (request.getHeader("Referer") ?: "/domains/$id/tags")
     }
 
     @PutMapping("/domains/{id}/tags/{tagId}")

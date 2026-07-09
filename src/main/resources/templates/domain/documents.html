@@ -36,6 +36,20 @@
             <input type="file" name="file" />
             <button type="submit" class="btn">Add document</button>
         </form>
+
+        <h3>Add a new tag</h3>
+        <form th:action="@{/domains/{id}/tags(id=${domain.id})}" method="post" class="tag-form">
+            <select name="parentPath">
+                <option value="">— root level —</option>
+                <option th:each="tag : ${availableTags}"
+                        th:value="${tag.path}"
+                        th:text="${tag.path} + ' (' + ${tag.name} + ')'">
+                </option>
+            </select>
+            <input type="text" name="name" placeholder="New tag name" required>
+            <input type="text" name="description" placeholder="Description">
+            <button type="submit" class="btn btn-secondary">Add tag</button>
+        </form>
     </section>
 
     <form th:action="@{/domains/{id}/documents(id=${domain.id})}" method="get" class="document-form" style="margin-bottom: 1.5rem;">
