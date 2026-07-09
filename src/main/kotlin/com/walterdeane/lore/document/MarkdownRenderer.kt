@@ -4,6 +4,7 @@ import org.commonmark.parser.Parser
 import org.commonmark.renderer.html.HtmlRenderer
 import org.springframework.stereotype.Component
 
+/** Renders stored chunk/document/chat-answer markdown to sanitized HTML for display templates. */
 @Component
 class MarkdownRenderer {
 

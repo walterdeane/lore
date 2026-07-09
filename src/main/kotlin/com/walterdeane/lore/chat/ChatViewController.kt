@@ -25,6 +25,13 @@ CONTEXT:
 %s
 """
 
+/**
+ * The "generation" half of RAG, tying together retrieval and the LLM in one request: hybrid search
+ * finds candidate chunks, an optional LLM-based rerank narrows them to the best few (see
+ * [RerankerService]), then those chunks are stuffed into a system prompt as grounding CONTEXT before
+ * asking the chat model to answer. This is the same corpus [SearchViewController]/[HybridSearchService]
+ * expose for browsing, but here the retrieved chunks become model input instead of a results page.
+ */
 @Controller
 @RequestMapping("/chat")
 class ChatViewController(
@@ -39,6 +46,13 @@ class ChatViewController(
 
     private val chatClient = chatClientBuilder.build()
 
+    /**
+     * Runs one full RAG turn for [q] scoped to [domainId]:
+     * 1. hybrid search fetches [RERANK_CANDIDATE_COUNT] candidate chunks;
+     * 2. optionally rerank them down to the top [CONTEXT_CHUNK_COUNT] most relevant;
+     * 3. concatenate their content into the CONTEXT block of [SYSTEM_PROMPT];
+     * 4. call the chat model and render its answer, alongside the sources used, so the user can verify grounding.
+     */
     @GetMapping
     fun chatPage(
         @RequestParam(required = false) q: String?,

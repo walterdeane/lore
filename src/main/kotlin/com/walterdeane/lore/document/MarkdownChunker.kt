@@ -3,6 +3,12 @@ package com.walterdeane.lore.document
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
+/**
+ * One of three chunking strategies (see [ChunkingStrategy.STRUCTURAL]): splits already-converted
+ * markdown at heading boundaries instead of by raw token count, so a chunk corresponds to a
+ * semantically whole section (a recipe, a chapter) rather than an arbitrary token window. Used by
+ * [StructuralTextSplitter] once a source file has been converted to markdown.
+ */
 @Component
 class MarkdownChunker {
 
@@ -71,6 +77,7 @@ class MarkdownChunker {
         return null
     }
 
+    /** Cuts markdown into segments at headings of [level] or shallower, keeping deeper headings as chunk body. */
     private fun splitAtLevel(markdown: String, level: Int, excludedHeaders: Set<String> = emptySet()): List<String> {
         val headingLine = Regex("""^(#{1,6}) (.+)""")
         val lines = markdown.lines()
@@ -100,6 +107,7 @@ class MarkdownChunker {
         return segments.map { it.joinToString("\n").trim() }.filter { it.isNotBlank() }
     }
 
+    /** Concatenates consecutive under-sized segments so tiny sections don't become their own low-context chunk. */
     private fun mergeShort(segments: List<String>, minChars: Int): List<String> {
         if (segments.isEmpty()) return emptyList()
         val result = mutableListOf<String>()

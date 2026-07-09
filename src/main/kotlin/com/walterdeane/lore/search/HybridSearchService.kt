@@ -19,6 +19,13 @@ fun fuse(bm25: List<UUID>, vector: List<UUID>, k: Int = 60): List<Pair<UUID, Dou
     return scores.entries.sortedByDescending { it.value }.map { it.key to it.value }
 }
 
+/**
+ * Orchestrates hybrid retrieval: run BM25 (keyword) and vector (semantic) search independently,
+ * then fuse their rankings with Reciprocal Rank Fusion so the result set benefits from both —
+ * exact term matches BM25 is good at, and paraphrase/semantic matches vector search is good at.
+ * This is the "R" (retrieval) half of RAG; [com.walterdeane.lore.chat.ChatViewController] is the
+ * consumer that feeds these results into an LLM as grounding context.
+ */
 @Service
 class HybridSearchService(
     private val bm25SearchService: BM25SearchService,
@@ -57,6 +64,11 @@ class HybridSearchService(
         val hasPrevious: Boolean get() = page > 0
     }
 
+    /**
+     * Retrieves candidatePoolSize chunk ids from each of BM25 and vector search, fuses them into
+     * one ranked list via [fuse], then hydrates only the ids needed for the requested page with a
+     * single follow-up SQL query (avoids re-running both searches per page).
+     */
     fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage {
         val poolSize = searchProperties.candidatePoolSize
         val bm25Ids = bm25SearchService.search(query, domainId, tags, size = poolSize, page = 0).results.map { it.chunkId }
@@ -72,6 +84,7 @@ class HybridSearchService(
         return SearchPage(results, total, page, size)
     }
 
+    /** Loads chunk/document metadata plus a query-highlighted headline for the given fused-result ids. */
     private fun hydrate(ids: List<UUID>, query: String): Map<UUID, Result> {
         val sql = """
             SELECT c.id, c.document_id, c.domain_id, c.chunk_index, c.chunk_strategy, c.tag_paths,

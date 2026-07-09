@@ -7,6 +7,11 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
+/**
+ * JSON API exposing the two retrieval strategies directly (as opposed to [SearchViewController],
+ * which renders HTML). Useful for comparing BM25-only vs. hybrid results side by side while
+ * developing or demoing the retrieval pipeline.
+ */
 @RestController
 @RequestMapping("/api/search")
 class SearchController(
@@ -14,6 +19,7 @@ class SearchController(
     private val hybridSearchService: HybridSearchService,
 ) {
 
+    /** Keyword-only search — see [BM25SearchService]. */
     @GetMapping("/bm25")
     fun bm25(
         @RequestParam q: String,
@@ -24,6 +30,7 @@ class SearchController(
     ): ResponseEntity<BM25SearchService.SearchPage> =
         ResponseEntity.ok(bm25SearchService.search(q, domainId, tags, size, page))
 
+    /** BM25 + vector search fused with RRF — see [HybridSearchService]. */
     @GetMapping("/hybrid")
     fun hybrid(
         @RequestParam q: String,

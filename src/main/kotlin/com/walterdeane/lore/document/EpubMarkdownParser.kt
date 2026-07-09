@@ -9,11 +9,18 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.util.zip.ZipFile
 
+/**
+ * Converts an EPUB to markdown by reading its spine (reading order) from the OPF manifest and
+ * translating each chapter's XHTML to markdown, preserving heading levels so
+ * [StructuralTextSplitter]/[MarkdownChunker] can later split on them. Feeds the STRUCTURAL
+ * chunking strategy; TOKEN chunking uses Tika's plain-text extraction instead and never calls this.
+ */
 @Component
 class EpubMarkdownParser {
 
     private val log = LoggerFactory.getLogger(EpubMarkdownParser::class.java)
 
+    /** Reads the EPUB's container/OPF metadata to find spine order, then concatenates each chapter's markdown. */
     fun parse(epubPath: String): String {
         return try {
             ZipFile(epubPath).use { zip ->
@@ -53,6 +60,7 @@ class EpubMarkdownParser {
         return manifest to spine
     }
 
+    /** Strips non-content elements (nav, scripts, figures) then walks the body converting tags to markdown syntax. */
     private fun htmlToMarkdown(html: String): String {
         val doc = Jsoup.parse(html)
         doc.select("head, script, style, nav, aside, footer, figure, figcaption").remove()

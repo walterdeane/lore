@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.util.UUID
 
+/** Raw JDBC access to the `domain` table — the top-level scope every document, chunk, and tag belongs to. */
 @Repository
 class DomainRepository(private val jdbcTemplate: JdbcTemplate) {
 

@@ -7,6 +7,12 @@ import org.springframework.data.domain.PageImpl
 import org.springframework.stereotype.Service
 import java.util.UUID
 
+/**
+ * A domain is the top-level scope for retrieval: every chunk belongs to exactly one domain, and
+ * every search/chat query is run against a single domain's corpus (see [DomainRepository],
+ * [com.walterdeane.lore.search.HybridSearchService]). It also carries the default chunking
+ * strategy/variant new documents inherit unless overridden per-document.
+ */
 @Service
 class DomainsService(private val domainRepository: DomainRepository) {
 
@@ -19,10 +25,7 @@ class DomainsService(private val domainRepository: DomainRepository) {
         return PageImpl(filtered.subList(start, end), pageable, filtered.size.toLong())
     }
 
-    fun getDomainById(id: UUID): Domain? {
-        // Placeholder for actual domain retrieval logic
-        return domainRepository.findById(id)
-    }
+    fun getDomainById(id: UUID): Domain? = domainRepository.findById(id)
 
     fun updateDomainById(domain: Domain) {
         domainRepository.update(domain)

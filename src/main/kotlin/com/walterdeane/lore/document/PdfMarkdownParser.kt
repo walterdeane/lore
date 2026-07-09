@@ -9,6 +9,12 @@ import java.io.File
 
 private data class PdfLine(val text: String, val fontSize: Float)
 
+/**
+ * Converts a PDF to markdown despite PDFs having no semantic heading tags: it tracks the rendered
+ * glyph height of each line via [FontTrackingStripper] and infers heading levels from font-size
+ * ratios relative to the document's median line. Rough, but good enough for
+ * [StructuralTextSplitter]/[MarkdownChunker] to split on the result.
+ */
 @Component
 class PdfMarkdownParser {
 
@@ -61,6 +67,7 @@ class PdfMarkdownParser {
             maxSize = 0f
         }
 
+        /** Maps each line's font-size ratio to the document's median size onto a heading level (or body text). */
         fun buildMarkdown(): String {
             if (lines.isEmpty()) return ""
             val sizes = lines.map { it.fontSize }.filter { it > 0f }.sorted()

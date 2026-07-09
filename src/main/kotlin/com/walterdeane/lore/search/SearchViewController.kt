@@ -13,6 +13,11 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import java.util.UUID
 
+/**
+ * Human-facing search UI: renders the retrieval side of the RAG pipeline on its own, without an
+ * LLM in the loop, so you can inspect what hybrid search actually returns before it gets fed to
+ * the chat model in [com.walterdeane.lore.chat.ChatViewController].
+ */
 @Controller
 @RequestMapping("/search")
 class SearchViewController(
@@ -24,6 +29,7 @@ class SearchViewController(
     private val markdownRenderer: MarkdownRenderer,
 ) {
 
+    /** Renders the search page; runs hybrid search only once a query and domain are both present. */
     @GetMapping
     fun searchPage(
         @RequestParam(required = false) q: String?,
@@ -55,6 +61,7 @@ class SearchViewController(
         return "search/index"
     }
 
+    /** Drill-down view showing the full text of a single retrieved chunk, e.g. for auditing why it matched. */
     @GetMapping("/chunks/{chunkId}")
     fun chunkDetail(
         @PathVariable chunkId: UUID,

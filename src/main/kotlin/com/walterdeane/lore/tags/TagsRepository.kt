@@ -6,6 +6,7 @@ import com.walterdeane.lore.model.Tag
 import java.util.UUID
 
 
+/** Raw JDBC access to the `tag` table, whose `path` column is a Postgres `ltree` materialized path (e.g. `cuisine.italian`). */
 @Repository
 class TagsRepository(private val jdbcTemplate: JdbcTemplate) {
     fun findAllByDomainId(domainId: java.util.UUID, query: String? = null): List<Tag> {
@@ -44,6 +45,7 @@ class TagsRepository(private val jdbcTemplate: JdbcTemplate) {
         return path != null && !path.contains(".")
     }
 
+    /** Auto-creates any missing ancestor tag so a deeply-nested path (e.g. `a.b.c`) always has a full chain of parents. */
     private fun createMissingTagPath(tag: Tag) {
         val parentPath = tag.path.substringBeforeLast(".", "")
         if (parentPath.isNotEmpty()) {

@@ -15,6 +15,16 @@ data class BoundaryConfig(
     val markdownHeadingLevel: Int = 2,
 )
 
+/**
+ * Entry point for the STRUCTURAL chunking strategy: converts a source file (EPUB/PDF) to markdown
+ * via [EpubMarkdownParser]/[PdfMarkdownParser], then delegates to [MarkdownChunker] to cut it at
+ * heading boundaries. [BoundaryConfig] tunes that split per [StructuralVariant] (e.g. a cookbook's
+ * "Ingredients"/"Method" sub-headers shouldn't themselves start new chunks). If markdown parsing
+ * fails or produces too few chunks, falls back to a heuristic line-based splitter over the raw
+ * per-page text Tika already extracted — a good illustration of why structural/semantic chunking
+ * is harder to get right than naive fixed-size token splitting ([DocumentIngestionService]'s
+ * TOKEN strategy).
+ */
 @Component
 class StructuralTextSplitter(
     private val epubMarkdownParser: EpubMarkdownParser,
@@ -80,7 +90,7 @@ class StructuralTextSplitter(
         return heuristicSplit(pages, variant, config)
     }
 
-    // Legacy heuristic path — used as fallback when markdown parsing fails.
+    /** Legacy heuristic path — used as fallback when markdown parsing fails or under-chunks. */
     private fun heuristicSplit(pages: List<Document>, variant: StructuralVariant, config: BoundaryConfig): List<Document> {
         val rawSegments = mutableListOf<String>()
         for (page in pages) {
@@ -94,6 +104,7 @@ class StructuralTextSplitter(
         return merged.filter { it.isNotBlank() }.map { Document(it) }
     }
 
+    /** Groups raw page lines into segments, starting a new one wherever [isHeadingInContext]/[couldBeHeading] fires. */
     private fun segmentPage(lines: List<String>, config: BoundaryConfig): List<String> {
         val segments = mutableListOf<MutableList<String>>()
         var current = mutableListOf<String>()
@@ -116,6 +127,7 @@ class StructuralTextSplitter(
         return segments.map { it.joinToString("\n").trim() }.filter { it.isNotBlank() }
     }
 
+    /** Cheap shape-based heading heuristic: short, capitalized/numbered, no trailing punctuation. */
     private fun couldBeHeading(trimmed: String, config: BoundaryConfig): Boolean {
         if (trimmed.length < 3 || trimmed.length > config.maxTitleLength) return false
         if (trimmed.endsWith(".") || trimmed.endsWith(",") || trimmed.endsWith(";") || trimmed.endsWith(":")) return false
@@ -126,6 +138,7 @@ class StructuralTextSplitter(
         return isNumbered || trimmed[0].isUpperCase()
     }
 
+    /** [couldBeHeading] plus a context check: a heading is usually preceded by a blank line or sentence end. */
     private fun isHeadingInContext(trimmed: String, lines: List<String>, index: Int, config: BoundaryConfig): Boolean {
         if (!couldBeHeading(trimmed, config)) return false
         val prevLine = if (index > 0) lines[index - 1].trim() else ""

@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
+/** `provider` picks the LLM backend (local "ollama" vs hosted "anthropic"); `rerankEnabled` toggles [com.walterdeane.lore.search.RerankerService]. */
 @ConfigurationProperties(prefix = "lore.chat")
 data class ChatProperties(val provider: String = "ollama", val rerankEnabled: Boolean = true)
 
@@ -18,6 +19,7 @@ data class ChatProperties(val provider: String = "ollama", val rerankEnabled: Bo
 @Configuration
 class ChatModelConfig(private val chatProperties: ChatProperties) {
 
+    /** Builds the shared [ChatClient.Builder] injected into [ChatViewController] and [com.walterdeane.lore.search.RerankerService]. */
     @Bean
     fun chatClientBuilder(ollamaChatModel: OllamaChatModel, anthropicChatModel: AnthropicChatModel): ChatClient.Builder =
         ChatClient.builder(

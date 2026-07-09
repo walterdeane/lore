@@ -26,6 +26,12 @@ class RerankerService(chatClientBuilder: ChatClient.Builder) {
 
     private val chatClient = chatClientBuilder.build()
 
+    /**
+     * Reranks [candidates] (typically the top-N fused hybrid-search hits) down to the best [topK]
+     * for feeding into the answering LLM's context window. Generic over T so both raw search
+     * results and already-hydrated chunks can be reranked; [contentOf] extracts the text to show
+     * the model. No-ops if there are already <= topK candidates.
+     */
     fun <T> rerank(query: String, candidates: List<T>, topK: Int, contentOf: (T) -> String): List<T> {
         if (candidates.size <= topK) return candidates
 

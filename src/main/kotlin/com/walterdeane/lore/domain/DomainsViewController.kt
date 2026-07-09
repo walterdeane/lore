@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import com.walterdeane.lore.tags.TagsService
 import java.util.UUID
 
+/** CRUD UI for domains, including their default chunking strategy/structural variant. */
 @Controller
 class DomainsViewController(
     private val domainsService: DomainsService,

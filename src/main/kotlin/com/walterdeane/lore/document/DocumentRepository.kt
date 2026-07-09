@@ -12,6 +12,7 @@ import java.sql.Timestamp
 import java.time.Instant
 import java.util.UUID
 
+/** Raw JDBC access to the `document` table: source-file metadata and ingestion status/config, one row per uploaded file. */
 @Repository
 class DocumentRepository(private val jdbcTemplate: JdbcTemplate) {
 
@@ -75,6 +76,7 @@ class DocumentRepository(private val jdbcTemplate: JdbcTemplate) {
         }
     }
 
+    /** Called by [DocumentIngestionService] as it moves a document through PENDING → COMPLETED/FAILED. */
     fun updateStatus(id: UUID, status: IngestionStatus, error: String? = null, ingestedAt: Instant? = null) {
         jdbcTemplate.update(
             "UPDATE document SET ingestion_status = ?, ingestion_error = ?, ingested_at = ? WHERE id = ?",

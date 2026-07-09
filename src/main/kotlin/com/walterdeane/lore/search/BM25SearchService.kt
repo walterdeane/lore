@@ -5,6 +5,12 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import java.util.UUID
 
+/**
+ * Classic lexical/keyword search using Postgres full-text search (`tsvector`/`ts_rank_cd`).
+ * This is the "sparse" retriever in the hybrid pipeline: strong on exact term/acronym matches,
+ * weak on paraphrases and synonyms — [VectorSearchService] covers that gap, and
+ * [HybridSearchService] merges the two.
+ */
 @Service
 class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
 
@@ -32,6 +38,11 @@ class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
         val hasPrevious: Boolean get() = page > 0
     }
 
+    /**
+     * Ranks chunks in [domainId] by Postgres's `ts_rank_cd` against a `plainto_tsquery` built from
+     * [query], optionally restricted to chunks under [tags] (see [tagFilterClause]). Also returns a
+     * highlighted excerpt (`ts_headline`) so result lists can show why a chunk matched.
+     */
     fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage {
         val tagClause = tagFilterClause(tags)
 
