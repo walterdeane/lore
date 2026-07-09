@@ -15,6 +15,13 @@ import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
 
+/**
+ * The ingestion half of the RAG pipeline: turns an uploaded [Document] into searchable [Chunk] rows.
+ * Steps are: (1) extract raw text with Tika, (2) split it into chunks using the resolved
+ * [ChunkingStrategy], (3) embed each chunk's text with [EmbeddingModel], (4) persist chunk text +
+ * embedding to Postgres/pgvector. Everything downstream — [com.walterdeane.lore.search.BM25SearchService],
+ * [com.walterdeane.lore.search.VectorSearchService] — reads what this writes.
+ */
 @Service
 class DocumentIngestionService(
     private val embeddingModel: EmbeddingModel,
@@ -23,9 +30,17 @@ class DocumentIngestionService(
     private val domainRepository: DomainRepository,
     private val chunkingStrategyResolver: ChunkingStrategyResolver,
     private val structuralTextSplitter: StructuralTextSplitter,
+    private val tokenOverlapChunker: TokenOverlapChunker,
+    private val chunkingProperties: ChunkingProperties,
 ) {
     private val log = LoggerFactory.getLogger(DocumentIngestionService::class.java)
 
+    /**
+     * Runs off the request thread ([Async]) since parsing, chunking, and embedding a whole document
+     * can take a while. Updates [document]'s [IngestionStatus] to COMPLETED or FAILED so the UI can
+     * poll for progress; any exception mid-pipeline is caught and recorded rather than left to crash
+     * the async executor.
+     */
     @Async
     fun ingest(document: Document) {
         try {
@@ -43,8 +58,9 @@ class DocumentIngestionService(
 
             log.info("[{}] chunking document", document.id)
             val tokenSplitter = TokenTextSplitter.builder().build()
+            fun tokenSplit() = tokenOverlapChunker.applyOverlap(tokenSplitter.split(pages), chunkingProperties.tokenOverlapChars)
             val splitDocuments = when (strategy) {
-                ChunkingStrategy.TOKEN -> tokenSplitter.split(pages)
+                ChunkingStrategy.TOKEN -> tokenSplit()
                 ChunkingStrategy.STRUCTURAL -> {
                     val variant = chunkingStrategyResolver.resolveVariant(document, domain)
                     log.info("[{}] STRUCTURAL variant: {}", document.id, variant)
@@ -52,7 +68,7 @@ class DocumentIngestionService(
                 }
                 ChunkingStrategy.SEMANTIC -> {
                     log.warn("[{}] SEMANTIC strategy not yet implemented, falling back to TOKEN", document.id)
-                    tokenSplitter.split(pages)
+                    tokenSplit()
                 }
             }
 

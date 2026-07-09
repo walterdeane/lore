@@ -32,6 +32,7 @@ lore:
     documents-dir: ${LORE_DOCS_DIR:${LORE_DATA_DIR:${user.home}/lore-data}/documents}
   chunking:
     default-strategy: TOKEN
+    token-overlap-chars: 200
   search:
     candidate-pool-size: 50
     rrf-k: 60
