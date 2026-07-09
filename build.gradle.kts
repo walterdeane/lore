@@ -3,7 +3,6 @@ plugins {
 	kotlin("plugin.spring") version "2.1.0"
 	id("org.springframework.boot") version "4.1.0"
 	id("io.spring.dependency-management") version "1.1.7"
-	kotlin("plugin.jpa") version "2.1.0"
 }
 
 group = "com.walterdeane"
@@ -23,8 +22,14 @@ extra["springAiVersion"] = "2.0.0"
 
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
-	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-flyway")
+	// Pageable/Page/PageableDefault (used for document/domain list pagination) need both the model
+	// classes (spring-data-commons) and Boot's autoconfiguration that registers the MVC argument
+	// resolver for them (spring-boot-data-commons, in Boot 4.x's per-feature autoconfigure split) —
+	// this app has no JPA repositories, so pull these in directly rather than via
+	// spring-boot-starter-data-jpa.
+	implementation("org.springframework.data:spring-data-commons")
+	implementation("org.springframework.boot:spring-boot-data-commons")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
 	implementation("nz.net.ultraq.thymeleaf:thymeleaf-layout-dialect:3.3.0")
@@ -44,7 +49,6 @@ dependencies {
 	runtimeOnly("org.postgresql:postgresql")
 	implementation("org.springframework.ai:spring-ai-spring-boot-docker-compose")
 	testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
-	testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-flyway-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -61,12 +65,6 @@ kotlin {
 	compilerOptions {
 		freeCompilerArgs.addAll("-Xjsr305=strict")
 	}
-}
-
-allOpen {
-	annotation("jakarta.persistence.Entity")
-	annotation("jakarta.persistence.MappedSuperclass")
-	annotation("jakarta.persistence.Embeddable")
 }
 
 tasks.withType<Test> {
