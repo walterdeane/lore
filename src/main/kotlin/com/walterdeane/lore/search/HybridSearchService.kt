@@ -46,6 +46,10 @@ class HybridSearchService(
         val rank: Double,
         val documentTitle: String,
         val documentAuthor: String?,
+        // Which retrieval leg(s) surfaced this chunk for this query — not a stored chunk property
+        // (every chunk always has both a tsvector and an embedding), so it's derived at query time
+        // from membership in the two pre-fusion candidate lists. See [hydrate].
+        val searchType: SearchType,
     )
 
     /**
@@ -79,13 +83,17 @@ class HybridSearchService(
         val pageIds = fused.drop(page * size).take(size)
         if (pageIds.isEmpty()) return SearchPage(emptyList(), total, page, size)
 
-        val hydrated = hydrate(pageIds.map { it.first }, query)
+        val hydrated = hydrate(pageIds.map { it.first }, query, bm25Ids.toSet(), vectorIds.toSet())
         val results = pageIds.mapNotNull { (id, score) -> hydrated[id]?.copy(rank = score) }
         return SearchPage(results, total, page, size)
     }
 
-    /** Loads chunk/document metadata plus a query-highlighted headline for the given fused-result ids. */
-    private fun hydrate(ids: List<UUID>, query: String): Map<UUID, Result> {
+    /**
+     * Loads chunk/document metadata plus a query-highlighted headline for the given fused-result ids.
+     * [bm25Ids]/[vectorIds] are the pre-fusion candidate sets, used only to classify each result's
+     * [Result.searchType] — a chunk in both is where RRF's fusion actually pays off.
+     */
+    private fun hydrate(ids: List<UUID>, query: String, bm25Ids: Set<UUID>, vectorIds: Set<UUID>): Map<UUID, Result> {
         val sql = """
             SELECT c.id, c.document_id, c.domain_id, c.chunk_index, c.chunk_strategy, c.tag_paths,
                    ts_headline('english', c.content, plainto_tsquery('english', ?), 'MaxWords=35, MinWords=15') AS headline,
@@ -114,9 +122,21 @@ class HybridSearchService(
                     rank = 0.0,
                     documentTitle = rs.getString("document_title"),
                     documentAuthor = rs.getString("document_author"),
+                    searchType = when {
+                        id in bm25Ids && id in vectorIds -> SearchType.BOTH
+                        id in vectorIds -> SearchType.EMBEDDING
+                        else -> SearchType.BM25
+                    },
                 )
             },
         )
         return rows.toMap()
     }
+}
+
+/** Which retrieval leg(s) surfaced a result: keyword search, semantic search, or both (the case RRF rewards). */
+enum class SearchType {
+    BM25,
+    EMBEDDING,
+    BOTH,
 }

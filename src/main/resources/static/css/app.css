@@ -550,6 +550,16 @@ details summary {
     gap: 0.75rem;
 }
 
+.result-searchtype {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-dim);
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
 .result-rank {
     font-size: 0.75rem;
     font-weight: 600;

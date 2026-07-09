@@ -53,6 +53,7 @@
         <ul class="result-list">
             <li class="result-card card" th:each="result : ${searchPage.results}">
                 <div class="result-header">
+                    <span class="result-searchtype" th:text="${result.searchType}">-</span>
                     <span class="result-rank" th:text="${#numbers.formatDecimal(result.rank, 1, 4)}">0.0</span>
                     <div class="result-tags">
                         <span class="tag-pill" th:each="tag : ${result.tagPaths}" th:text="${tag}">tag</span>
