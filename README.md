@@ -14,7 +14,8 @@ exact chunks that informed it, so you can verify the model isn't making things u
   app for the first time, and a walkthrough of the basic workflow.
 - **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** — every configurable property, how to switch
   between the local Ollama model and Anthropic's Claude, and what each retrieval/chunking knob does.
-- **[PRD.md](PRD.md)** — the original product/design brief this project was planned against.
+- **[PRD.md](PRD.md)** — the product/design brief, kept up to date with the actual implementation.
+- **[TODO.md](TODO.md)** — what's still open, undecided, or explicitly deferred.
 
 ## What it does
 
