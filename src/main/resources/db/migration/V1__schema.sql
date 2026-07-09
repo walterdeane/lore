@@ -56,8 +56,6 @@ CREATE TABLE chunk (
     embedding       VECTOR(768) NOT NULL,
     chunk_index     INT        NOT NULL,
     chunk_strategy  TEXT,
-    parent_chunk_id UUID       REFERENCES chunk(id) ON DELETE SET NULL,
-    chunk_level     TEXT,
     page_number     INT,
     token_count     INT,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
