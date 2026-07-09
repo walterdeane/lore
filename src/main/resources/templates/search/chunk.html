@@ -102,16 +102,16 @@
         </section>
     </div>
 
-</div>
-
-<script>
-document.querySelectorAll('time.local-time').forEach(function (el) {
-    var dt = new Date(el.getAttribute('datetime'));
-    el.textContent = dt.toLocaleString(undefined, {
-        year: 'numeric', month: 'short', day: 'numeric',
-        hour: '2-digit', minute: '2-digit'
+    <script>
+    document.querySelectorAll('time.local-time').forEach(function (el) {
+        var dt = new Date(el.getAttribute('datetime'));
+        el.textContent = dt.toLocaleString(undefined, {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
     });
-});
-</script>
+    </script>
+
+</div>
 </body>
 </html>

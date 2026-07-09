@@ -87,21 +87,34 @@
            class="btn btn-secondary">Next &rarr;</a>
     </nav>
 
-</div>
+    <script>
+    (function () {
+        function syncVariant(strategySelect) {
+            var form = strategySelect.closest('form');
+            var variantSelect = form && form.querySelector('select[name="structuralVariant"]');
+            if (!variantSelect) return;
+            variantSelect.disabled = strategySelect.value !== 'STRUCTURAL';
+        }
+        document.querySelectorAll('select[name="chunkStrategy"]').forEach(function (sel) {
+            syncVariant(sel);
+            sel.addEventListener('change', function () { syncVariant(sel); });
+        });
 
-<script>
-(function () {
-    function syncVariant(strategySelect) {
-        var form = strategySelect.closest('form');
-        var variantSelect = form && form.querySelector('select[name="structuralVariant"]');
-        if (!variantSelect) return;
-        variantSelect.disabled = strategySelect.value !== 'STRUCTURAL';
-    }
-    document.querySelectorAll('select[name="chunkStrategy"]').forEach(function (sel) {
-        syncVariant(sel);
-        sel.addEventListener('change', function () { syncVariant(sel); });
-    });
-}());
-</script>
+        function fillTitleFromFilename(fileInput) {
+            var form = fileInput.closest('form');
+            var titleInput = form && form.querySelector('input[name="title"]');
+            var file = fileInput.files && fileInput.files[0];
+            if (!titleInput || !file || titleInput.value.trim() !== '') return;
+            var name = file.name;
+            var dot = name.lastIndexOf('.');
+            titleInput.value = dot > 0 ? name.slice(0, dot) : name;
+        }
+        document.querySelectorAll('input[type="file"][name="file"]').forEach(function (fileInput) {
+            fileInput.addEventListener('change', function () { fillTitleFromFilename(fileInput); });
+        });
+    }());
+    </script>
+
+</div>
 </body>
 </html>
