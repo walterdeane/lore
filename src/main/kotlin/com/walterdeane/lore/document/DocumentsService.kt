@@ -40,6 +40,10 @@ class DocumentsService(
 
     fun getDocumentById(id: UUID): Document? = documentRepository.findById(id)
 
+    fun updateDocument(id: UUID, title: String, author: String?, sourcePath: String) {
+        documentRepository.update(id, title, author, sourcePath)
+    }
+
     fun updateDocumentTags(id: UUID, tags: List<String>) {
         documentRepository.updateTags(id, tags)
         chunkRepository.updateTagPathsByDocumentId(id, tags)

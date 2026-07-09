@@ -74,7 +74,7 @@
 
             <form th:action="@{/domains/{id}/documents/{documentId}(id=${domain.id}, documentId=${document.id})}"
                   method="post" class="document-form">
-                <input type="hidden" name="_method" value="update">
+                <input type="hidden" name="_method" value="put">
                 <div class="field-group">
                     <label for="title">Title</label>
                     <input type="text" id="title" name="title" th:value="${document.title}" required>

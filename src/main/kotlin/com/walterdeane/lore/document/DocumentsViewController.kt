@@ -137,8 +137,26 @@ class DocumentsViewController(
         documentsService.updateDocumentTags(documentId, form.tags)
         return "redirect:/domains/$domainId/documents/$documentId"
     }
+
+    @PutMapping("/domains/{domainId}/documents/{documentId}")
+    fun updateDocument(
+        @PathVariable domainId: UUID,
+        @PathVariable documentId: UUID,
+        @ModelAttribute form: DocumentUpdateForm,
+        redirectAttributes: RedirectAttributes,
+    ): String {
+        documentsService.updateDocument(documentId, form.title, form.author, form.sourcePath)
+        redirectAttributes.addFlashAttribute("message", "Document updated")
+        return "redirect:/domains/$domainId/documents/$documentId"
+    }
 }
 
 data class DocumentTagsForm(
     val tags: List<String> = emptyList(),
+)
+
+data class DocumentUpdateForm(
+    val title: String = "",
+    val author: String? = null,
+    val sourcePath: String = "",
 )

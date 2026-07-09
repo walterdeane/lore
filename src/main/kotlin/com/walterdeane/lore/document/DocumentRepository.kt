@@ -88,6 +88,17 @@ class DocumentRepository(private val jdbcTemplate: JdbcTemplate) {
         }
     }
 
+    fun update(id: UUID, title: String, author: String?, sourcePath: String) {
+        jdbcTemplate.update(
+            "UPDATE document SET title = ?, author = ?, source_path = ? WHERE id = ?"
+        ) { ps ->
+            ps.setString(1, title)
+            ps.setString(2, author)
+            ps.setString(3, sourcePath)
+            ps.setObject(4, id)
+        }
+    }
+
     fun updateTags(id: UUID, tags: List<String>) {
         jdbcTemplate.update(
             "UPDATE document SET tags = ? WHERE id = ?"
