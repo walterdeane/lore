@@ -128,7 +128,7 @@ class StructuralTextSplitter(
     }
 
     /** Cheap shape-based heading heuristic: short, capitalized/numbered, no trailing punctuation. */
-    private fun couldBeHeading(trimmed: String, config: BoundaryConfig): Boolean {
+    internal fun couldBeHeading(trimmed: String, config: BoundaryConfig): Boolean {
         if (trimmed.length < 3 || trimmed.length > config.maxTitleLength) return false
         if (trimmed.endsWith(".") || trimmed.endsWith(",") || trimmed.endsWith(";") || trimmed.endsWith(":")) return false
         val lower = trimmed.lowercase()
@@ -139,7 +139,7 @@ class StructuralTextSplitter(
     }
 
     /** [couldBeHeading] plus a context check: a heading is usually preceded by a blank line or sentence end. */
-    private fun isHeadingInContext(trimmed: String, lines: List<String>, index: Int, config: BoundaryConfig): Boolean {
+    internal fun isHeadingInContext(trimmed: String, lines: List<String>, index: Int, config: BoundaryConfig): Boolean {
         if (!couldBeHeading(trimmed, config)) return false
         val prevLine = if (index > 0) lines[index - 1].trim() else ""
         if (prevLine.isBlank()) return true

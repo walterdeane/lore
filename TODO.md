@@ -27,10 +27,10 @@ These need a decision before they can be scoped as real work:
 - **SEMANTIC chunking strategy** — declared in `ChunkingStrategy` but unimplemented; silently falls
   back to TOKEN (with overlap). Real semantic chunking (e.g. embedding-similarity-based splitting)
   still needs designing.
-- **Test coverage.** Only `HybridSearchServiceTest` (the pure `fuse()` function) and the boilerplate
-  Spring context test exist. Nothing covers chunking (`MarkdownChunker`, `StructuralTextSplitter`,
-  `TokenOverlapChunker`), ingestion, the reranker's response parsing, or the EPUB zip/folder-bundle
-  detection logic in `DocumentsService`.
+- **`DocumentIngestionService` integration tests.** Still no test for the actual end-to-end
+  ingestion pipeline (Tika extraction → chunk → embed → store) — that needs a real Postgres
+  (Testcontainers) and a real or stubbed embedding model, a bigger undertaking than the unit tests
+  just added for the pure logic pieces below. Not covered by this pass.
 
 ## Explicitly deferred (not active work)
 
@@ -45,6 +45,14 @@ These need a decision before they can be scoped as real work:
 
 ## Recently completed
 
+- **Test coverage for chunking and upload-detection logic** — 47 new tests across
+  `MarkdownChunkerTest`, `TokenOverlapChunkerTest`, `StructuralTextSplitterTest`,
+  `EpubZipResolverTest`, and `RerankerServiceTest`. Two small behavior-preserving refactors made
+  this possible without mocks, matching the existing `fuse()`-in-`HybridSearchService` pattern:
+  extracted the EPUB/zip upload-detection logic out of `DocumentsService` into its own
+  dependency-free `EpubZipResolver`, and pulled `RerankerService`'s response-parsing regex out into
+  a standalone `parseRerankOrder` function. `DocumentIngestionService` integration tests are a
+  separate, bigger undertaking — see above.
 - **Fixed PDF ingestion.** `NoSuchMethodError: PDF2XHTML.setIgnoreContentStreamSpaceGlyphs` — our
   explicit `pdfbox:3.0.3` conflicted with the `pdfbox:3.0.7` that `tika-parser-pdf-module:3.3.1`
   actually requests (confirmed via `./gradlew dependencyInsight --dependency org.apache.pdfbox:pdfbox`).

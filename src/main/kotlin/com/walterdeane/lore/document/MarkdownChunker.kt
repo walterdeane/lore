@@ -78,7 +78,7 @@ class MarkdownChunker {
     }
 
     /** Cuts markdown into segments at headings of [level] or shallower, keeping deeper headings as chunk body. */
-    private fun splitAtLevel(markdown: String, level: Int, excludedHeaders: Set<String> = emptySet()): List<String> {
+    internal fun splitAtLevel(markdown: String, level: Int, excludedHeaders: Set<String> = emptySet()): List<String> {
         val headingLine = Regex("""^(#{1,6}) (.+)""")
         val lines = markdown.lines()
         val segments = mutableListOf<MutableList<String>>()

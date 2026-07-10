@@ -17,6 +17,20 @@ Passages:
 """
 
 /**
+ * Extracts a passage ranking from the chat model's free-text response: every integer found, in
+ * the order it appears, filtered to valid indices and de-duplicated. Pulled out as a pure function
+ * so the parsing (the part most likely to need adjusting as different models respond differently)
+ * is testable without a real chat model — the model isn't guaranteed to follow the "ONLY a JSON
+ * array" instruction exactly, so this deliberately tolerates surrounding prose, not just strict JSON.
+ */
+internal fun parseRerankOrder(response: String, candidateCount: Int): List<Int> =
+    Regex("\\d+").findAll(response)
+        .map { it.value.toInt() }
+        .filter { it in 0 until candidateCount }
+        .distinct()
+        .toList()
+
+/**
  * LLM-scored reranking: Ollama has no cross-encoder rerank endpoint, so relevance
  * ordering is done listwise by asking the chat model to rank numbered passages in a
  * single call. Falls back to the original order if the model's response can't be parsed.
@@ -43,12 +57,7 @@ class RerankerService(chatClientBuilder: ChatClient.Builder) {
             .call()
             .content() ?: ""
 
-        val order = Regex("\\d+").findAll(response)
-            .map { it.value.toInt() }
-            .filter { it in candidates.indices }
-            .distinct()
-            .toList()
-
+        val order = parseRerankOrder(response, candidates.size)
         val ranked = order.map { candidates[it] }
         return ranked.ifEmpty { candidates }.take(topK)
     }
