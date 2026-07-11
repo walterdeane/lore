@@ -40,6 +40,9 @@ dependencies {
 	implementation("org.springframework.ai:spring-ai-starter-vector-store-pgvector")
 	implementation("org.springframework.ai:spring-ai-vector-store-advisor")
 	implementation("org.springframework.ai:spring-ai-tika-document-reader")
+	// Used by PdfMarkdownParser to key off a PDF's real embedded outline/TOC when one exists,
+	// instead of always guessing headings from font size — see TODO.md's PdfMarkdownParser entry.
+	implementation("org.springframework.ai:spring-ai-pdf-document-reader")
 	implementation("org.jsoup:jsoup:1.18.3")
 	// Must match the pdfbox version tika-parser-pdf-module (pulled in transitively via
 	// spring-ai-tika-document-reader) actually requests, or Tika's PDF parser breaks at runtime

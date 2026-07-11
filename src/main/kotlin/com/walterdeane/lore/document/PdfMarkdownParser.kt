@@ -4,16 +4,21 @@ import org.apache.pdfbox.Loader
 import org.apache.pdfbox.text.PDFTextStripper
 import org.apache.pdfbox.text.TextPosition
 import org.slf4j.LoggerFactory
+import org.springframework.ai.reader.pdf.ParagraphPdfDocumentReader
+import org.springframework.core.io.FileSystemResource
 import org.springframework.stereotype.Component
 import java.io.File
 
-private data class PdfLine(val text: String, val fontSize: Float)
+private data class PdfLine(val text: String, val fontSize: Float, val startsNewParagraph: Boolean)
 
 /**
- * Converts a PDF to markdown despite PDFs having no semantic heading tags: it tracks the rendered
- * glyph height of each line via [FontTrackingStripper] and infers heading levels from font-size
- * ratios relative to the document's median line. Rough, but good enough for
- * [StructuralTextSplitter]/[MarkdownChunker] to split on the result.
+ * Converts a PDF to markdown. Prefers the PDF's own embedded outline/TOC (real document structure —
+ * see [ParagraphPdfDocumentReader]) when one exists, since that's far more reliable than guessing;
+ * many PDFs have no outline, though, so this falls back to [FontTrackingStripper], which tracks the
+ * rendered glyph height of each line and infers heading levels from font-size ratios relative to the
+ * document's median line — rougher, but a PDF with no outline has no better signal to use. Either
+ * way the output is markdown good enough for [StructuralTextSplitter]/[MarkdownChunker]/
+ * [SymanticTextSplitter] to split on.
  */
 @Component
 class PdfMarkdownParser {
@@ -21,6 +26,8 @@ class PdfMarkdownParser {
     private val log = LoggerFactory.getLogger(PdfMarkdownParser::class.java)
 
     fun parse(pdfPath: String): String {
+        parseFromOutline(pdfPath)?.let { return it }
+
         return try {
             Loader.loadPDF(File(pdfPath)).use { doc ->
                 val stripper = FontTrackingStripper()
@@ -34,11 +41,61 @@ class PdfMarkdownParser {
         }
     }
 
+    /**
+     * [ParagraphPdfDocumentReader] throws at construction time when the PDF has no embedded
+     * outline/TOC (`Assert.notNull` on `getDocumentOutline()`), so a null return here — not an
+     * exception — is the normal, expected signal to fall back to the font-size heuristic.
+     */
+    private fun parseFromOutline(pdfPath: String): String? {
+        return try {
+            val paragraphs = ParagraphPdfDocumentReader(FileSystemResource(pdfPath)).get()
+            if (paragraphs.isEmpty()) return null
+            paragraphs.joinToString("\n\n") { doc ->
+                val level = (doc.metadata["level"] as? Int) ?: 0
+                val headingMarker = "#".repeat((level + 2).coerceAtMost(6))
+                val title = doc.metadata["title"] as? String ?: ""
+                val body = cleanLayoutExtractedBody(doc.text ?: "")
+                if (body.isBlank()) "$headingMarker $title" else "$headingMarker $title\n\n$body"
+            }
+        } catch (e: Exception) {
+            log.info("PDF {} has no usable outline/TOC ({}), falling back to font-size heuristic", pdfPath, e.message)
+            null
+        }
+    }
+
+    /**
+     * [ParagraphPdfDocumentReader] extracts text via PDFBox's region-based
+     * `PDFLayoutTextStripperByArea`, which (unlike [FontTrackingStripper]'s line-by-line callbacks)
+     * carries over print-production page furniture — bare page numbers, InDesign export filenames
+     * (`012-015_30591.indd`), press-run stamps (`(Fogra 39)Job:05-30591...`) — and pads short lines
+     * with runs of spaces to preserve column alignment. Left alone, each of those becomes its own
+     * spurious "paragraph" once split on blank lines downstream (see [SymanticTextSplitter.extractParagraphs]).
+     */
+    private fun cleanLayoutExtractedBody(text: String): String =
+        text.lines()
+            .filterNot { isPageFurniture(it) }
+            .joinToString("\n") { it.replace(Regex(" {2,}"), " ").trim() }
+            .trim()
+
+    private fun isPageFurniture(line: String): Boolean {
+        val trimmed = line.trim()
+        if (trimmed.isEmpty()) return false
+        if (trimmed.matches(Regex("""\d{1,4}"""))) return true
+        if (trimmed.contains(".indd", ignoreCase = true)) return true
+        if (trimmed.contains("Fogra", ignoreCase = true)) return true
+        // Press-run stamps like "0 6 - C 6 9 5 0 6 #175 Dtp:225 Page:11" — letter-tracked job
+        // codes followed by a "Dtp:"/"Page:" plate reference.
+        if (Regex("""(?i)\bDtp:\d+\b""").containsMatchIn(trimmed)) return true
+        if (Regex("""(?i)\bPage:\d+\b""").containsMatchIn(trimmed)) return true
+        return false
+    }
+
     private inner class FontTrackingStripper : PDFTextStripper() {
 
         val lines = mutableListOf<PdfLine>()
         private val buf = StringBuilder()
         private var maxSize = 0f
+        private var pendingParagraphBreak: Boolean = false
 
         override fun writeString(text: String, positions: List<TextPosition>) {
             for (p in positions) {
@@ -48,6 +105,11 @@ class PdfMarkdownParser {
                 if (h > maxSize) maxSize = h
             }
             buf.append(text)
+        }
+
+        override fun getParagraphStart(): String {
+            pendingParagraphBreak = true
+            return super.getParagraphStart()
         }
 
         override fun writeLineSeparator() {
@@ -62,8 +124,9 @@ class PdfMarkdownParser {
 
         private fun flush() {
             val text = buf.toString().trim()
-            if (text.isNotBlank()) lines.add(PdfLine(text, maxSize))
+            if (text.isNotBlank()) lines.add(PdfLine(text, maxSize, this.pendingParagraphBreak))
             buf.clear()
+            this.pendingParagraphBreak = false
             maxSize = 0f
         }
 
@@ -80,7 +143,8 @@ class PdfMarkdownParser {
                     ratio > 1.8f -> sb.append("\n\n# ${line.text}\n\n")
                     ratio > 1.4f -> sb.append("\n\n## ${line.text}\n\n")
                     ratio > 1.15f -> sb.append("\n\n### ${line.text}\n\n")
-                    else -> sb.append("${line.text}\n")
+                    else -> if (line.startsNewParagraph) sb.append("\n\n${line.text}\n")
+                            else  sb.append("${line.text}\n")
                 }
             }
             return sb.toString().trim()

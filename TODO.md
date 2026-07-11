@@ -24,13 +24,24 @@ These need a decision before they can be scoped as real work:
 
 ## Open — scoped, not yet built
 
-- **SEMANTIC chunking strategy** — declared in `ChunkingStrategy` but unimplemented; silently falls
-  back to TOKEN (with overlap). Real semantic chunking (e.g. embedding-similarity-based splitting)
-  still needs designing.
+- **SEMANTIC chunking strategy** — `SymanticTextSplitter` now implements embedding-similarity
+  breakpoint detection (paragraph sliding windows → cosine distance between neighbors → per-document
+  percentile threshold → cut, oversized chunks capped via `TokenTextSplitter` fallback). Defaults
+  (`windowSize=2`, `breakpointPercentile=0.85`, `maxChunkChars=4000`) were tuned against a real
+  cookbook EPUB via `SymanticTextSplitterSmokeTest` (`SMOKE=true` env var, not part of the normal
+  suite — needs local Ollama running). Wired into `DocumentIngestionService`'s `SEMANTIC` branch.
 - **`DocumentIngestionService` integration tests.** Still no test for the actual end-to-end
   ingestion pipeline (Tika extraction → chunk → embed → store) — that needs a real Postgres
   (Testcontainers) and a real or stubbed embedding model, a bigger undertaking than the unit tests
   just added for the pure logic pieces below. Not covered by this pass.
+- **HyDE (Hypothetical Document Embeddings).** Pre-search query transformation: ask the chat LLM to
+  generate a hypothetical answer to the query, then embed and search with that instead of (or
+  alongside) the raw query — a hypothetical answer sits closer in embedding space to real answer
+  chunks than the bare question does. Complements the existing post-search LLM reranking rather
+  than replacing it (see `RerankerService`). Not yet designed — where it'd hook into
+  `HybridSearchService`, whether it's on by default or a toggle like `rerank-enabled`, and how it
+  interacts with the BM25 leg (which wants the literal query terms, not a paraphrase) all need
+  thought.
 
 ## Explicitly deferred (not active work)
 
@@ -42,9 +53,30 @@ These need a decision before they can be scoped as real work:
   TOKEN chunking instead. `parent_chunk_id`/`chunk_level` were removed from the schema entirely
   rather than left as unused columns.
 - **Markdown / web-clip source types** — PRD said "design for later"; only PDF and EPUB exist today.
+- **Cross-encoder reranking** — an alternative to the current LLM-listwise reranker (`RerankerService`),
+  scoring `(query, passage)` pairs directly via a dedicated model (e.g. `bge-reranker-base/large`,
+  `ms-marco-MiniLM`) instead of asking the chat LLM to order a list. Likely cheaper/faster and more
+  reliable than listwise rerank, but Ollama has no cross-encoder serving mode, so it would mean
+  standing up a new local serving path (ONNX/sentence-transformers runtime or a dedicated rerank
+  server) — new infra surface, not a config swap. Revisit if listwise rerank quality proves
+  inadequate in practice; not a near-term priority.
 
 ## Recently completed
 
+- **`PdfMarkdownParser` now prefers a PDF's real embedded outline/TOC over guessing headings from
+  font size.** Found while smoke-testing the semantic splitter against a real PDF ("Great Meat"):
+  the old font-ratio heuristic misread stray larger-font glyphs and a print-shop production stamp as
+  markdown headings (`##`/`###`), fragmenting body text into tiny false-boundary paragraphs.
+  `PdfMarkdownParser.parseFromOutline` now tries Spring AI's `ParagraphPdfDocumentReader` first (keys
+  off `PDDocument.getDocumentCatalog().getDocumentOutline()` — real bookmarks, not a guess), falling
+  back to the old `FontTrackingStripper` heuristic when a PDF has no embedded outline (the reader
+  throws at construction in that case). `ParagraphPdfDocumentReader`'s underlying
+  `PDFLayoutTextStripperByArea` extraction turned out to carry its own page-furniture noise — bare
+  page numbers, InDesign export filenames (`012-015_30591.indd`), press-run stamps
+  (`(Fogra 39)Job:05-30591...`, `Dtp:225 Page:11`) — each becoming its own spurious paragraph once
+  split on blank lines; `cleanLayoutExtractedBody` strips those line patterns and collapses the
+  layout engine's column-padding whitespace before paragraph-splitting. Benefits `StructuralTextSplitter`
+  too, since it shares `PdfMarkdownParser`. New dependency: `spring-ai-pdf-document-reader`.
 - **Test coverage for chunking and upload-detection logic** — 47 new tests across
   `MarkdownChunkerTest`, `TokenOverlapChunkerTest`, `StructuralTextSplitterTest`,
   `EpubZipResolverTest`, and `RerankerServiceTest`. Two small behavior-preserving refactors made

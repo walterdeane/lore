@@ -30,6 +30,7 @@ class DocumentIngestionService(
     private val domainRepository: DomainRepository,
     private val chunkingStrategyResolver: ChunkingStrategyResolver,
     private val structuralTextSplitter: StructuralTextSplitter,
+    private val symanticTextSplitter: SymanticTextSplitter,
     private val tokenOverlapChunker: TokenOverlapChunker,
     private val chunkingProperties: ChunkingProperties,
 ) {
@@ -66,9 +67,9 @@ class DocumentIngestionService(
                     log.info("[{}] STRUCTURAL variant: {}", document.id, variant)
                     structuralTextSplitter.split(document.sourcePath, document.sourceType, pages, variant)
                 }
+
                 ChunkingStrategy.SEMANTIC -> {
-                    log.warn("[{}] SEMANTIC strategy not yet implemented, falling back to TOKEN", document.id)
-                    tokenSplit()
+                    symanticTextSplitter.split(document.sourcePath, document.sourceType, pages)
                 }
             }
 
