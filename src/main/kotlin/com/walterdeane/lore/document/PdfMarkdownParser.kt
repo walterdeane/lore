@@ -71,6 +71,13 @@ class PdfMarkdownParser {
      * distinct sections the way page furniture does. [minSectionFraction] is deliberately high so a
      * coincidentally-repeated short phrase (e.g. "Serves 4" across a few recipes) isn't mistaken for
      * one — a true running header should clear it by a wide margin since it's on every single page.
+     *
+     * Some books bake the page number directly into the header line (e.g. "THE MEAT HOOK MEAT BOOK
+     * 14" on page 14, "...15" on page 15) — every occurrence is then a distinct string, so none of
+     * them individually clear the frequency bar and the header leaks straight into body text
+     * mid-sentence. [normalizeForHeaderDetection] strips a trailing page number before counting, but
+     * only when the remaining phrase is substantial (3+ words); "Serves 4" isn't collapsed to
+     * "Serves" and confused with a title, since that's short enough to be real content.
      */
     private fun detectRunningHeaders(
         bodies: List<String>,
@@ -79,13 +86,19 @@ class PdfMarkdownParser {
     ): Set<String> {
         val sectionCounts = mutableMapOf<String, Int>()
         for (body in bodies) {
-            val linesInSection = body.lines().map { it.trim() }
+            val linesInSection = body.lines().map { normalizeForHeaderDetection(it.trim()) }
                 .filter { it.isNotBlank() && it.length <= maxHeaderLength }
                 .toSet()
             for (line in linesInSection) sectionCounts.merge(line, 1, Int::plus)
         }
         val minOccurrences = (bodies.size * minSectionFraction).coerceAtLeast(3.0)
         return sectionCounts.filterValues { it >= minOccurrences }.keys
+    }
+
+    private fun normalizeForHeaderDetection(line: String): String {
+        val stripped = line.replace(Regex("""\s+\d{1,4}$"""), "").trim()
+        val wordCount = stripped.split(Regex("""\s+""")).count { it.isNotBlank() }
+        return if (stripped.length >= 12 && wordCount >= 3) stripped else line
     }
 
     /**
@@ -99,7 +112,7 @@ class PdfMarkdownParser {
      */
     private fun cleanLayoutExtractedBody(text: String, runningHeaders: Set<String> = emptySet()): String =
         text.lines()
-            .filterNot { isPageFurniture(it) || it.trim() in runningHeaders }
+            .filterNot { isPageFurniture(it) || normalizeForHeaderDetection(it.trim()) in runningHeaders }
             .joinToString("\n") { it.replace(Regex(" {2,}"), " ").trim() }
             .trim()
 

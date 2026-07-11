@@ -20,6 +20,41 @@ import kotlin.math.roundToInt
  */
 class SymanticTextSplitterSmokeTest {
 
+    /**
+     * Fast, embedding-free check: parses a PDF/EPUB to markdown and reports any line that still
+     * repeats suspiciously often (a candidate running header that slipped past
+     * [PdfMarkdownParser]'s furniture filters), without paying for the full embedding sweep. Point
+     * it at a specific file with DOC_FILENAME_CONTAINS.
+     */
+    @EnabledIfEnvironmentVariable(named = "SMOKE", matches = "true")
+    @Test
+    fun `check parsed markdown for repeated lines that look like leaked running headers`() {
+        val docsDir = resolveDocsDir()
+        assumeTrue(docsDir.isDirectory, "no documents dir at $docsDir, skipping")
+        val (file, sourceType) = pickSmallestDocument(docsDir)
+            ?: run { assumeTrue(false, "no matching document found, skipping"); error("unreachable") }
+
+        println("=== checking ${file.name} ($sourceType) for leaked repeated lines ===")
+        val markdown = when (sourceType) {
+            SourceType.EPUB -> EpubMarkdownParser().parse(file.path)
+            SourceType.PDF -> PdfMarkdownParser().parse(file.path)
+        }
+        assumeTrue(markdown.isNotBlank(), "markdown parser returned blank, skipping")
+
+        val counts = mutableMapOf<String, Int>()
+        for (line in markdown.lines()) {
+            val trimmed = line.trim()
+            if (trimmed.length in 5..80) counts.merge(trimmed, 1, Int::plus)
+        }
+        val suspicious = counts.filterValues { it >= 5 }.entries.sortedByDescending { it.value }
+        if (suspicious.isEmpty()) {
+            println("no line repeats 5+ times verbatim — no obvious leaked headers")
+        } else {
+            println("lines repeating 5+ times (possible leaked running headers):")
+            suspicious.forEach { (line, count) -> println("  x$count: $line") }
+        }
+    }
+
     @EnabledIfEnvironmentVariable(named = "SMOKE", matches = "true")
     @Test
     fun `print paragraph, window, and breakpoint stats for a real document`() {
@@ -116,7 +151,7 @@ class SymanticTextSplitterSmokeTest {
 
     private fun pickSmallestDocument(dir: File): Pair<File, SourceType>? {
         val wanted = System.getenv("SOURCE_TYPE")?.uppercase()?.let { SourceType.valueOf(it) }
-        return dir.listFiles()
+        val candidates = dir.listFiles()
             ?.mapNotNull { f ->
                 when (f.extension.lowercase()) {
                     "epub" -> f to SourceType.EPUB
@@ -125,6 +160,11 @@ class SymanticTextSplitterSmokeTest {
                 }
             }
             ?.filter { wanted == null || it.second == wanted }
-            ?.minByOrNull { it.first.length() }
+            ?: return null
+        val filenameContains = System.getenv("DOC_FILENAME_CONTAINS")
+        if (filenameContains != null) {
+            return candidates.firstOrNull { it.first.name.contains(filenameContains, ignoreCase = true) }
+        }
+        return candidates.minByOrNull { it.first.length() }
     }
 }

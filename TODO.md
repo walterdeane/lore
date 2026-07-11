@@ -83,6 +83,17 @@ These need a decision before they can be scoped as real work:
   every page of that chapter only) don't clear a book-wide frequency threshold, so those are instead
   matched by a `^chapter\s+\d+` pattern in `isPageFurniture`. Benefits `StructuralTextSplitter` too,
   since it shares `PdfMarkdownParser`. New dependency: `spring-ai-pdf-document-reader`.
+  Follow-up found via a real re-ingest ("The Meat Hook Meat Book"): some books bake the page number
+  directly into the header line (`THE MEAT HOOK MEAT BOOK 14` on page 14, `...15` on page 15) —
+  every occurrence was a distinct string under exact-match counting, so none individually cleared
+  `detectRunningHeaders`' frequency bar and the header leaked into 71 of 436 chunks (16%), mid-
+  sentence. Fixed with `normalizeForHeaderDetection`, which strips a trailing page number before
+  counting/matching — but only when the remaining phrase is 3+ words and 12+ chars, so it can't
+  collapse something like "Serves 4" down to "Serves" and mistake it for a title. Verified clean
+  against the real file (`SymanticTextSplitterSmokeTest`'s new fast, embedding-free repeated-line
+  check — `DOC_FILENAME_CONTAINS` env var targets a specific document). Not yet fixed: the cover/
+  title page's stylized display text extracts with literal letter-spacing intact (e.g. "T he\nME A
+  T\nHOOK" instead of "The\nMEAT\nHOOK") — cosmetic, isolated to one chunk per book, not chased.
 - **Test coverage for chunking and upload-detection logic** — 47 new tests across
   `MarkdownChunkerTest`, `TokenOverlapChunkerTest`, `StructuralTextSplitterTest`,
   `EpubZipResolverTest`, and `RerankerServiceTest`. Two small behavior-preserving refactors made
