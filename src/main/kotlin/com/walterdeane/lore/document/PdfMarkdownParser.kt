@@ -46,7 +46,7 @@ class PdfMarkdownParser {
      * outline/TOC (`Assert.notNull` on `getDocumentOutline()`), so a null return here — not an
      * exception — is the normal, expected signal to fall back to the font-size heuristic.
      */
-    private fun parseFromOutline(pdfPath: String): String? {
+    internal fun parseFromOutline(pdfPath: String): String? {
         return try {
             val paragraphs = ParagraphPdfDocumentReader(FileSystemResource(pdfPath)).get()
             if (paragraphs.isEmpty()) return null
@@ -79,11 +79,16 @@ class PdfMarkdownParser {
      * only when the remaining phrase is substantial (3+ words); "Serves 4" isn't collapsed to
      * "Serves" and confused with a title, since that's short enough to be real content.
      */
-    private fun detectRunningHeaders(
+    internal fun detectRunningHeaders(
         bodies: List<String>,
         maxHeaderLength: Int = 60,
         minSectionFraction: Double = 0.3,
-    ): Set<String> {
+    ): Set<String> = sectionCounts(bodies, maxHeaderLength)
+        .filterValues { it >= (bodies.size * minSectionFraction).coerceAtLeast(3.0) }
+        .keys
+
+    /** Exposed separately from [detectRunningHeaders] so tests can inspect raw counts, not just the final filtered set. */
+    internal fun sectionCounts(bodies: List<String>, maxHeaderLength: Int = 60): Map<String, Int> {
         val sectionCounts = mutableMapOf<String, Int>()
         for (body in bodies) {
             val linesInSection = body.lines().map { normalizeForHeaderDetection(it.trim()) }
@@ -91,14 +96,21 @@ class PdfMarkdownParser {
                 .toSet()
             for (line in linesInSection) sectionCounts.merge(line, 1, Int::plus)
         }
-        val minOccurrences = (bodies.size * minSectionFraction).coerceAtLeast(3.0)
-        return sectionCounts.filterValues { it >= minOccurrences }.keys
+        return sectionCounts
     }
 
-    private fun normalizeForHeaderDetection(line: String): String {
-        val stripped = line.replace(Regex("""\s+\d{1,4}$"""), "").trim()
+    /**
+     * The layout stripper's column-based extraction leaves irregular internal spacing on the same
+     * logical line — e.g. "THE MEAT  HOOK  MEAT  BOOK" vs "THE  MEAT  HOOK  MEAT  BOOK" — which,
+     * left uncollapsed, fragments one running header into multiple distinct count keys and can keep
+     * every variant individually under the frequency threshold. Collapsing runs of spaces first
+     * (before the trailing-page-number strip) is what makes those variants compare equal.
+     */
+    internal fun normalizeForHeaderDetection(line: String): String {
+        val collapsed = line.replace(Regex(" {2,}"), " ").trim()
+        val stripped = collapsed.replace(Regex("""\s+\d{1,4}$"""), "").trim()
         val wordCount = stripped.split(Regex("""\s+""")).count { it.isNotBlank() }
-        return if (stripped.length >= 12 && wordCount >= 3) stripped else line
+        return if (stripped.length >= 12 && wordCount >= 3) stripped else collapsed
     }
 
     /**

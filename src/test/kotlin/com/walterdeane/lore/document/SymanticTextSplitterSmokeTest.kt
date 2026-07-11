@@ -7,6 +7,8 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.springframework.ai.ollama.OllamaEmbeddingModel
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.ai.ollama.api.OllamaEmbeddingOptions
+import org.springframework.ai.reader.pdf.ParagraphPdfDocumentReader
+import org.springframework.core.io.FileSystemResource
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -53,6 +55,46 @@ class SymanticTextSplitterSmokeTest {
             println("lines repeating 5+ times (possible leaked running headers):")
             suspicious.forEach { (line, count) -> println("  x$count: $line") }
         }
+    }
+
+    /** Inspects raw running-header frequency counts directly, to see why a header did/didn't clear the threshold. */
+    @EnabledIfEnvironmentVariable(named = "SMOKE", matches = "true")
+    @Test
+    fun `dump running header frequency counts for a real PDF`() {
+        val docsDir = resolveDocsDir()
+        assumeTrue(docsDir.isDirectory, "no documents dir at $docsDir, skipping")
+        val (file, sourceType) = pickSmallestDocument(docsDir)
+            ?: run { assumeTrue(false, "no matching document found, skipping"); error("unreachable") }
+        assumeTrue(sourceType == SourceType.PDF, "this diagnostic only applies to PDFs")
+
+        val paragraphs = ParagraphPdfDocumentReader(FileSystemResource(file.path)).get()
+        val bodies = paragraphs.map { it.text ?: "" }
+        println("total outline-level bodies: ${bodies.size}")
+        val minOccurrences = (bodies.size * 0.3).coerceAtLeast(3.0)
+        println("minOccurrences threshold (30%): $minOccurrences")
+
+        val parser = PdfMarkdownParser()
+        val counts = parser.sectionCounts(bodies)
+        val relevant = counts.entries.filter { it.key.contains("MEAT", ignoreCase = true) || it.key.contains("HOOK", ignoreCase = true) }
+            .sortedByDescending { it.value }
+        println("counts for lines containing MEAT/HOOK (top 20):")
+        relevant.take(20).forEach { (line, count) -> println("  $count: '$line'") }
+
+        val detected = parser.detectRunningHeaders(bodies)
+        println("detected running headers (${detected.size}): $detected")
+
+        println("--- raw line-level search for 'meat hook' across all bodies (first 30 hits) ---")
+        var hits = 0
+        bodies.forEachIndexed { bi, body ->
+            body.lines().forEach { line ->
+                if (hits < 30 && line.contains("meat hook", ignoreCase = true)) {
+                    hits++
+                    println("  body[$bi] len=${line.length}: '${line.trim()}'")
+                }
+            }
+        }
+        val totalOccurrences = bodies.sumOf { body -> Regex("(?i)meat hook meat book").findAll(body).count() }
+        println("total raw occurrences of 'meat hook meat book' substring across all bodies: $totalOccurrences")
     }
 
     @EnabledIfEnvironmentVariable(named = "SMOKE", matches = "true")
