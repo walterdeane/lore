@@ -91,7 +91,14 @@ lore:
   heading boundaries, so a chunk corresponds to a whole semantic section rather than an arbitrary
   token window. Needs a **structural variant** (see below) to know how to interpret headings for the
   content type.
-- **`SEMANTIC`** — not yet implemented; falls back to `TOKEN` (with overlap applied) if selected.
+- **`SEMANTIC`** — embedding-similarity chunking: source text is split into paragraphs, each
+  embedded together with a few neighboring paragraphs for a stable signal, and a cut is made
+  wherever consecutive-paragraph similarity drops below a threshold computed per-document (not a
+  fixed constant, since a terse cookbook and a dense academic PDF don't share one similarity scale).
+  Any resulting chunk over a size cap is split further with `TokenTextSplitter` as a backstop, since
+  a long span of internally-similar content (e.g. a conversion table) can otherwise never trigger a
+  cut. Tuning (window size, threshold percentile, size cap) isn't yet exposed as configuration —
+  see `SymanticTextSplitter.SemanticConfig` in the source.
 
 ### Structural variants
 

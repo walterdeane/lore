@@ -147,7 +147,9 @@ Three strategies, selectable per-document or per-domain: TOKEN (fixed-size, via 
 TokenTextSplitter, with configurable trailing-context overlap between chunks), STRUCTURAL
 (heading-aware — converts the source to markdown and splits at heading boundaries, with
 GENERIC/COOKBOOK/ACADEMIC variants tuning what counts as a boundary for that content type), and
-SEMANTIC (declared, not yet implemented — falls back to TOKEN). See docs/CONFIGURATION.md.
+SEMANTIC (embedding-similarity — paragraphs embedded in sliding windows, cut where consecutive
+similarity drops below a per-document threshold, oversized chunks capped via TokenTextSplitter).
+See docs/CONFIGURATION.md.
 
 
 API Surface

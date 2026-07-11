@@ -29,9 +29,13 @@ hierarchical **tags** (e.g. `cuisine.italian.northern`) within a domain.
   they're used, since there's no local cross-encoder rerank endpoint to lean on.
 - **RAG chat** — retrieves relevant chunks for a question, stuffs them into the model's context, and
   answers with the sources shown alongside the answer.
-- **Multiple chunking strategies** — fixed-size token chunking (with configurable overlap), or
+- **Multiple chunking strategies** — fixed-size token chunking (with configurable overlap),
   heading-aware structural chunking with per-content-type tuning (a cookbook's recipe boundaries
-  look nothing like an academic paper's section boundaries).
+  look nothing like an academic paper's section boundaries), or embedding-similarity semantic
+  chunking that cuts where consecutive passages stop being topically similar.
+- **Outline-aware PDF parsing** — PDFs with an embedded table of contents are split using that real
+  structure rather than guessed from font size, with print-production noise (page numbers, running
+  headers) filtered out; PDFs without one fall back to a font-size heuristic.
 - **Local-first, cloud-optional** — chat/generation can run entirely on your machine via Ollama, or
   be switched to Anthropic's API when you want a stronger model. Embeddings always run locally.
 - **Robust document ingestion** — handles the messy real-world cases: EPUBs that arrive as `.zip`
