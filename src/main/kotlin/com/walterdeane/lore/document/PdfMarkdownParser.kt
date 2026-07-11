@@ -50,11 +50,12 @@ class PdfMarkdownParser {
         return try {
             val paragraphs = ParagraphPdfDocumentReader(FileSystemResource(pdfPath)).get()
             if (paragraphs.isEmpty()) return null
+            val runningHeaders = detectRunningHeaders(paragraphs.map { it.text ?: "" })
             paragraphs.joinToString("\n\n") { doc ->
                 val level = (doc.metadata["level"] as? Int) ?: 0
                 val headingMarker = "#".repeat((level + 2).coerceAtMost(6))
                 val title = doc.metadata["title"] as? String ?: ""
-                val body = cleanLayoutExtractedBody(doc.text ?: "")
+                val body = cleanLayoutExtractedBody(doc.text ?: "", runningHeaders)
                 if (body.isBlank()) "$headingMarker $title" else "$headingMarker $title\n\n$body"
             }
         } catch (e: Exception) {
@@ -64,16 +65,41 @@ class PdfMarkdownParser {
     }
 
     /**
+     * A running header/footer (book title, chapter label — e.g. "Great Meat", "chapter 1 Beef")
+     * gets reprinted on nearly every page, so it shows up in nearly every outline section's
+     * extracted text; real content doesn't repeat verbatim across a large fraction of the book's
+     * distinct sections the way page furniture does. [minSectionFraction] is deliberately high so a
+     * coincidentally-repeated short phrase (e.g. "Serves 4" across a few recipes) isn't mistaken for
+     * one — a true running header should clear it by a wide margin since it's on every single page.
+     */
+    private fun detectRunningHeaders(
+        bodies: List<String>,
+        maxHeaderLength: Int = 60,
+        minSectionFraction: Double = 0.3,
+    ): Set<String> {
+        val sectionCounts = mutableMapOf<String, Int>()
+        for (body in bodies) {
+            val linesInSection = body.lines().map { it.trim() }
+                .filter { it.isNotBlank() && it.length <= maxHeaderLength }
+                .toSet()
+            for (line in linesInSection) sectionCounts.merge(line, 1, Int::plus)
+        }
+        val minOccurrences = (bodies.size * minSectionFraction).coerceAtLeast(3.0)
+        return sectionCounts.filterValues { it >= minOccurrences }.keys
+    }
+
+    /**
      * [ParagraphPdfDocumentReader] extracts text via PDFBox's region-based
      * `PDFLayoutTextStripperByArea`, which (unlike [FontTrackingStripper]'s line-by-line callbacks)
      * carries over print-production page furniture — bare page numbers, InDesign export filenames
-     * (`012-015_30591.indd`), press-run stamps (`(Fogra 39)Job:05-30591...`) — and pads short lines
-     * with runs of spaces to preserve column alignment. Left alone, each of those becomes its own
-     * spurious "paragraph" once split on blank lines downstream (see [SymanticTextSplitter.extractParagraphs]).
+     * (`012-015_30591.indd`), press-run stamps (`(Fogra 39)Job:05-30591...`), and repeated running
+     * headers ([detectRunningHeaders]) — and pads short lines with runs of spaces to preserve column
+     * alignment. Left alone, each of those becomes its own spurious "paragraph" once split on blank
+     * lines downstream (see [SymanticTextSplitter.extractParagraphs]).
      */
-    private fun cleanLayoutExtractedBody(text: String): String =
+    private fun cleanLayoutExtractedBody(text: String, runningHeaders: Set<String> = emptySet()): String =
         text.lines()
-            .filterNot { isPageFurniture(it) }
+            .filterNot { isPageFurniture(it) || it.trim() in runningHeaders }
             .joinToString("\n") { it.replace(Regex(" {2,}"), " ").trim() }
             .trim()
 
@@ -87,6 +113,11 @@ class PdfMarkdownParser {
         // codes followed by a "Dtp:"/"Page:" plate reference.
         if (Regex("""(?i)\bDtp:\d+\b""").containsMatchIn(trimmed)) return true
         if (Regex("""(?i)\bPage:\d+\b""").containsMatchIn(trimmed)) return true
+        // Chapter-label running headers (e.g. "chapter 1 Beef") repeat on every page within their
+        // own chapter but not the rest of the book, so detectRunningHeaders' book-wide frequency
+        // threshold misses them — this pattern is specific enough that real content is very
+        // unlikely to open a line with it.
+        if (Regex("""(?i)^chapter\s+\d+\b""").containsMatchIn(trimmed)) return true
         return false
     }
 

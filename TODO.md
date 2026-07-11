@@ -75,8 +75,14 @@ These need a decision before they can be scoped as real work:
   page numbers, InDesign export filenames (`012-015_30591.indd`), press-run stamps
   (`(Fogra 39)Job:05-30591...`, `Dtp:225 Page:11`) — each becoming its own spurious paragraph once
   split on blank lines; `cleanLayoutExtractedBody` strips those line patterns and collapses the
-  layout engine's column-padding whitespace before paragraph-splitting. Benefits `StructuralTextSplitter`
-  too, since it shares `PdfMarkdownParser`. New dependency: `spring-ai-pdf-document-reader`.
+  layout engine's column-padding whitespace before paragraph-splitting. Also stripped: running
+  headers. Book-wide ones (e.g. the book's own title, reprinted on every page) are caught by
+  `detectRunningHeaders` — a line repeating verbatim across at least 30% of the PDF's distinct
+  outline sections is page furniture, not content (real content, even short repeated phrases like
+  "Serves 4", doesn't clear that bar). Chapter-scoped headers (e.g. "chapter 1 Beef", reprinted on
+  every page of that chapter only) don't clear a book-wide frequency threshold, so those are instead
+  matched by a `^chapter\s+\d+` pattern in `isPageFurniture`. Benefits `StructuralTextSplitter` too,
+  since it shares `PdfMarkdownParser`. New dependency: `spring-ai-pdf-document-reader`.
 - **Test coverage for chunking and upload-detection logic** — 47 new tests across
   `MarkdownChunkerTest`, `TokenOverlapChunkerTest`, `StructuralTextSplitterTest`,
   `EpubZipResolverTest`, and `RerankerServiceTest`. Two small behavior-preserving refactors made
