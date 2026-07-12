@@ -31,12 +31,6 @@ These need a decision before they can be scoped as real work:
   cookbook EPUB via `SymanticTextSplitterSmokeTest`, now in the `integrationTest` source set (run via
   `./gradlew integrationTest`, not part of the normal `test` task — needs local Ollama running).
   Wired into `DocumentIngestionService`'s `SEMANTIC` branch.
-- **`DocumentIngestionService` integration tests.** Still no test for the actual end-to-end
-  ingestion pipeline (Tika extraction → chunk → embed → store) — needs a real Postgres
-  (Testcontainers) and a real embedding model (real local Ollama, not stubbed — measured ~24ms/chunk
-  for `nomic-embed-text`, so even a few-hundred-page fixture stays well under a minute). The
-  `integrationTest` Gradle source set (see build.gradle.kts) now exists for this — same home as
-  `SymanticTextSplitterSmokeTest` — but the ingestion test itself isn't written yet.
 - **HyDE (Hypothetical Document Embeddings).** Pre-search query transformation: ask the chat LLM to
   generate a hypothetical answer to the query, then embed and search with that instead of (or
   alongside) the raw query — a hypothetical answer sits closer in embedding space to real answer
@@ -66,6 +60,37 @@ These need a decision before they can be scoped as real work:
 
 ## Recently completed
 
+- **`DocumentIngestionService` integration tests.** Real end-to-end coverage of the ingestion
+  pipeline (Tika extraction → STRUCTURAL chunking → real `nomic-embed-text` embedding via local
+  Ollama → Postgres/pgvector storage), in the new `integrationTest` Gradle source set (see "Gradle
+  `integrationTest` suite" below). `DocumentIngestionServiceIntegrationTest` ingests two checked-in
+  public-domain fixtures — `fda-bad-bug-book-2nd-ed.pdf` (FDA "Bad Bug Book", 2nd ed.; 292 pages,
+  real embedded outline) and `jekyll-and-hyde.epub` (Standard Ebooks) — and asserts on chunk count,
+  embedding dimensionality (768), BM25 `search_vector` population, and domain/tag denormalization.
+  Both fixtures use STRUCTURAL explicitly rather than the app's TOKEN default, since TOKEN never
+  touches `PdfMarkdownParser`/`EpubMarkdownParser` at all (a separate Tika → `TokenTextSplitter`
+  path) and so wouldn't exercise the outline-parsing/running-header-stripping logic this test exists
+  to catch regressions in. `LoreApplicationTests` (previously `@Disabled` pending Testcontainers) now
+  runs for real as part of the same suite.
+  One fixture swap along the way: an archive.org-scanned EPUB was tried first but rejected — Tika's
+  own `EpubParser` threw `EpubZipException` on it (not a strictly valid EPUB container; the
+  `mimetype` entry wasn't first/uncompressed as the EPUB spec requires), unrelated to any Lore code.
+  Real bug found and fixed in the process: the container-sharing design in `AbstractIntegrationTest`
+  originally put the shared Postgres `@Container` field in an abstract base class's companion
+  object, assuming JUnit5's `@Testcontainers` field-discovery would treat it as one JVM-wide
+  singleton across subclasses — it didn't. Each subclass silently got its own separate container
+  (confirmed via containerId logging), and once two were competing for the same Docker resources,
+  connections intermittently failed with `CannotGetJdbcConnectionException`. Looked at first like
+  environmental flakiness (a loaded Docker Desktop VM, then a genuinely unhealthy Docker Desktop
+  install needing a reinstall) before the real, deterministic cause was found. Fixed by moving the
+  container into a plain top-level Kotlin `object` (an unambiguous singleton) and wiring it via
+  `@DynamicPropertySource` instead of `@Testcontainers`/`@Container`/`@ServiceConnection` — confirmed
+  with several consecutive clean `./gradlew integrationTest` runs.
+- **Gradle `integrationTest` suite.** Added the `jvm-test-suite` plugin with a dedicated
+  `integrationTest` source set/task — the modern Gradle equivalent of Maven's Surefire/Failsafe
+  split, for tests needing real local infra (Postgres via Testcontainers, local Ollama) that should
+  stay out of `./gradlew build`/`check`. `SymanticTextSplitterSmokeTest` moved here from `src/test`,
+  replacing its ad-hoc `SMOKE=true` env-var gate with the task split itself.
 - **`PdfMarkdownParser` now prefers a PDF's real embedded outline/TOC over guessing headings from
   font size.** Found while smoke-testing the semantic splitter against a real PDF ("Great Meat"):
   the old font-ratio heuristic misread stray larger-font glyphs and a print-shop production stamp as

@@ -86,6 +86,20 @@ testing {
 			useJUnitJupiter()
 			dependencies {
 				implementation(project())
+				// Same Boot test starters + kotlin-test as the "test" source set (see main
+				// dependencies block) — @SpringBootTest and kotlin.test.* assertions need them here too.
+				implementation("org.springframework.boot:spring-boot-starter-actuator-test")
+				implementation("org.springframework.boot:spring-boot-starter-flyway-test")
+				implementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+				implementation("org.jetbrains.kotlin:kotlin-test-junit5")
+				// Real Postgres (pgvector + ltree, matching compose.yaml) via Testcontainers — see
+				// AbstractIntegrationTest for why this is a plain container, not @Testcontainers/
+				// @Container/@ServiceConnection (which turned out not to share one container across
+				// subclasses of an abstract base class).
+				// io.spring.dependency-management doesn't flatten Spring Boot's BOM's own transitive
+				// import of testcontainers-bom into the integrationTest suite's configurations, so
+				// this needs an explicit version rather than inheriting one.
+				implementation("org.testcontainers:postgresql:1.21.4")
 				runtimeOnly("org.junit.platform:junit-platform-launcher")
 			}
 			targets {
