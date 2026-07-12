@@ -70,7 +70,7 @@
                     <dt>Tags</dt>
                     <dd>
                         <span class="tag-pill" th:each="tagPath : ${document.tags}"
-                              th:text="${tagsByPath[tagPath] != null ? tagsByPath[tagPath].name : tagPath}">tag</span>
+                              th:text="${tagsByPath.get(tagPath) != null ? tagsByPath.get(tagPath).name : tagPath}">tag</span>
                     </dd>
                 </div>
             </dl>

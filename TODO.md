@@ -5,13 +5,6 @@ rationale — this file just tracks what's left and what's been decided.
 
 ## Open — scoped, not yet built
 
-- **SEMANTIC chunking strategy** — `SymanticTextSplitter` now implements embedding-similarity
-  breakpoint detection (paragraph sliding windows → cosine distance between neighbors → per-document
-  percentile threshold → cut, oversized chunks capped via `TokenTextSplitter` fallback). Defaults
-  (`windowSize=2`, `breakpointPercentile=0.85`, `maxChunkChars=4000`) were tuned against a real
-  cookbook EPUB via `SymanticTextSplitterSmokeTest`, now in the `integrationTest` source set (run via
-  `./gradlew integrationTest`, not part of the normal `test` task — needs local Ollama running).
-  Wired into `DocumentIngestionService`'s `SEMANTIC` branch.
 - **HyDE (Hypothetical Document Embeddings).** Pre-search query transformation: ask the chat LLM to
   generate a hypothetical answer to the query, then embed and search with that instead of (or
   alongside) the raw query — a hypothetical answer sits closer in embedding space to real answer
@@ -51,6 +44,22 @@ rationale — this file just tracks what's left and what's been decided.
 
 ## Recently completed
 
+- **Fixed tag pills showing raw ltree paths instead of names.** Both `domain/documents.html` and
+  `domain/document.html` resolved a document's tag paths to display names via
+  `${tagsByPath[tagPath] != null ? tagsByPath[tagPath].name : tagPath}` — the bracket `[tagPath]`
+  map-index syntax silently returned `null` for every lookup (confirmed by comparing it directly
+  against `tagsByPath.get(tagPath)` in the same request, which found the entry correctly) even
+  though `tagsByPath` and the document's tag paths were byte-identical, same-domain, correctly
+  populated data all the way down through the JDBC layer — a genuine SpringEL/Thymeleaf quirk with
+  bracket-indexer syntax on a `Map<String, _>` keyed by a dynamic String containing dots, not a data
+  or repository bug. Fixed by switching both templates to explicit `.get(tagPath)` calls.
+- **SEMANTIC chunking strategy** — `SymanticTextSplitter` implements embedding-similarity breakpoint
+  detection (paragraph sliding windows → cosine distance between neighbors → per-document percentile
+  threshold → cut, oversized chunks capped via `TokenTextSplitter` fallback). Defaults
+  (`windowSize=2`, `breakpointPercentile=0.85`, `maxChunkChars=4000`) were tuned against a real
+  cookbook EPUB via `SymanticTextSplitterSmokeTest`, now in the `integrationTest` source set (run via
+  `./gradlew integrationTest`, not part of the normal `test` task — needs local Ollama running).
+  Wired into `DocumentIngestionService`'s `SEMANTIC` branch.
 - **Documents list is now a dense table, not a card grid.** `domain/documents.html` renders title,
   author, tags, status, and actions as table columns (reusing the `.tags-table` CSS pattern already
   established by `domain/tags.html`, broadened to `.tags-table, .documents-table` rather than
@@ -58,9 +67,6 @@ rationale — this file just tracks what's left and what's been decided.
   `@PageableDefault`/query logic as before, just a different row layout. `DocumentsViewController`
   now also passes `tagsByPath` to the list page (previously only the detail page had it), so tag
   pills can resolve ltree paths to names the same way the detail page already does.
-  Noted but not fixed (pre-existing, not introduced by this change): tag pills show the raw ltree
-  path instead of the resolved name on both the list and detail pages — `tagsByPath[tagPath]` isn't
-  resolving for at least some tags currently in use.
 - **`DocumentIngestionService` integration tests.** Real end-to-end coverage of the ingestion
   pipeline (Tika extraction → STRUCTURAL chunking → real `nomic-embed-text` embedding via local
   Ollama → Postgres/pgvector storage), in the new `integrationTest` Gradle source set (see "Gradle
@@ -167,7 +173,8 @@ rationale — this file just tracks what's left and what's been decided.
 - Hybrid BM25 + vector search fused with Reciprocal Rank Fusion, plus optional LLM-based listwise
   reranking.
 - Three chunking strategies: TOKEN (with configurable overlap), STRUCTURAL (heading-aware, with
-  GENERIC/COOKBOOK/ACADEMIC variants), SEMANTIC (stub, falls back to TOKEN).
+  GENERIC/COOKBOOK/ACADEMIC variants), SEMANTIC (embedding-similarity breakpoint detection — see
+  above).
 - RAG chat with an Ollama/Anthropic provider switch, citations shown alongside answers.
 - Robust EPUB upload handling: trailing whitespace in filenames, macOS "Compress"-wrapped single
   files, and browser-zipped folder-style EPUB bundles (e.g. Apple Books exports).

@@ -57,7 +57,7 @@ data class Chunk(
     val createdAt: Instant,
 )
 
-/** TOKEN: fixed-size splitting ([org.springframework.ai.transformer.splitter.TokenTextSplitter]). STRUCTURAL: heading-aware (see [com.walterdeane.lore.document.StructuralTextSplitter]). SEMANTIC: not yet implemented, falls back to TOKEN. */
+/** TOKEN: fixed-size splitting ([org.springframework.ai.transformer.splitter.TokenTextSplitter]). STRUCTURAL: heading-aware (see [com.walterdeane.lore.document.StructuralTextSplitter]). SEMANTIC: embedding-similarity breakpoint detection (see [com.walterdeane.lore.document.SymanticTextSplitter]). */
 enum class ChunkingStrategy { TOKEN, SEMANTIC, STRUCTURAL }
 
 /** Shapes the STRUCTURAL splitter's heuristics for a given document type (see [com.walterdeane.lore.document.BoundaryConfig]). */
