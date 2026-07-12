@@ -14,6 +14,18 @@ rationale — this file just tracks what's left and what's been decided.
   interacts with the BM25 leg (which wants the literal query terms, not a paraphrase) all need
   thought.
 
+- **Agentic follow-up retrieval.** After the first retrieval+rerank pass, let the LLM decide whether
+  it has enough context to answer or wants to issue an additional, more targeted query for more RAG
+  results — useful for multi-hop/broad questions that one retrieval pass doesn't fully cover, a
+  different failure mode than HyDE's vocabulary-mismatch problem above. Rated a better bet than HyDE:
+  it targets an incomplete-retrieval gap the current single-pass pipeline can't address at all, versus
+  HyDE's recall gain being unproven given BM25 + reranking already cover a lot of that ground. Needs a
+  hard cap on follow-up rounds (2-3 max) to bound latency/cost, and ideally the "enough context?"
+  decision folded into a call the LLM is already making (e.g. alongside answer generation) rather than
+  a separate LLM round-trip, so it doesn't stack a third LLM hop on top of reranking. Not yet
+  designed — where the follow-up query re-enters `HybridSearchService`, how repeated/near-duplicate
+  follow-ups are avoided, and how retrieved chunks across rounds get merged/deduped all need thought.
+
 ## Explicitly deferred (not active work)
 
 - **Multi-domain search** — confirmed as out of scope. The PRD's original query shape took
