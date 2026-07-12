@@ -57,23 +57,45 @@
         <button type="submit" class="btn btn-secondary">Search</button>
     </form>
 
-    <section class="card-grid">
-        <div class="card" th:each="document : ${documentsPage.content}">
-            <h3 th:text="${document.title}">Document name</h3>
-            <p class="text-dim" th:text="${document.author}">Author</p>
-            <div class="document-actions">
+    <table class="documents-table" th:if="${not documentsPage.content.isEmpty()}">
+        <thead>
+        <tr>
+            <th>Title</th>
+            <th>Author</th>
+            <th>Tags</th>
+            <th>Status</th>
+            <th class="documents-table-actions">Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="document : ${documentsPage.content}">
+            <td th:text="${document.title}">Document name</td>
+            <td class="text-dim" th:text="${document.author}">Author</td>
+            <td>
+                <div class="documents-table-tags">
+                    <span class="tag-pill" th:each="tagPath : ${document.tags}"
+                          th:text="${tagsByPath[tagPath] != null ? tagsByPath[tagPath].name : tagPath}">tag</span>
+                </div>
+            </td>
+            <td>
+                <span class="document-pill"
+                      th:classappend="${document.ingestionStatus.name() == 'FAILED'} ? 'document-pill-error' : ''"
+                      th:text="${document.ingestionStatus}">Status</span>
+            </td>
+            <td class="documents-table-actions">
                 <a class="btn btn-secondary"
                    th:href="@{/domains/{id}/documents/{documentId}(id=${domain.id}, documentId=${document.id})}">
-                    View document
+                    View
                 </a>
-            </div>
-            <form th:action="@{/domains/{id}/documents/{documentId}(id=${domain.id}, documentId=${document.id})}"
-                  method="post" class="delete-form">
-                <input type="hidden" name="_method" value="delete">
-                <button type="submit" class="btn btn-danger">Delete</button>
-            </form>
-        </div>
-    </section>
+                <form th:action="@{/domains/{id}/documents/{documentId}(id=${domain.id}, documentId=${document.id})}"
+                      method="post" class="inline-form">
+                    <input type="hidden" name="_method" value="delete">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
 
     <p th:if="${documentsPage.content.isEmpty()}" class="text-dim">No documents found.</p>
 

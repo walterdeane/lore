@@ -3,25 +3,6 @@
 Status snapshot of what's built vs what's still open. See PRD.md for the domain model and design
 rationale — this file just tracks what's left and what's been decided.
 
-## Open — undecided
-
-These need a decision before they can be scoped as real work:
-
-- **Multi-domain search.** The original PRD's query shape took `domainIds` (plural); the actual
-  implementation (`HybridSearchService`, `ChatViewController`) only ever scopes to one domain per
-  query. Worth building, or is single-domain the real design going forward?
-- **Document `createdAt`/`updatedAt`.** In the PRD's original domain model, not in the `Document`
-  model or schema. Add them, or confirm they're not needed?
-- **Tag "children" endpoint.** `GET /domains/{id}/tags/{tagId}/children` was in the original API
-  surface but never built — `TagsService.getTagTree` supersedes it for the UI. Worth adding as a
-  real endpoint for something else, or is the tree-building approach sufficient?
-- **Documents list layout at scale.** `domain/documents.html` renders documents as a card grid
-  (`@PageableDefault(size = 25)`); fine at current volumes (~10 documents), but flagged for revisit
-  once there are a lot more. Card blocks don't scale well past a few dozen — a denser table (title,
-  author, tags, status, actions as columns) would pack far more rows on screen. Leaning toward
-  table + pagination + the existing title search (not search-only, since browsing a domain's full
-  catalog is still useful) — not decided.
-
 ## Open — scoped, not yet built
 
 - **SEMANTIC chunking strategy** — `SymanticTextSplitter` now implements embedding-similarity
@@ -42,6 +23,16 @@ These need a decision before they can be scoped as real work:
 
 ## Explicitly deferred (not active work)
 
+- **Multi-domain search** — confirmed as out of scope. The PRD's original query shape took
+  `domainIds` (plural); single-domain-per-query (`HybridSearchService`, `ChatViewController`) is the
+  real design going forward, not a gap to fill in.
+- **Document `createdAt`/`updatedAt`** — confirmed as not needed. Was in the PRD's original domain
+  model but never made it into the `Document` model or schema; not useful metadata for this app.
+- **Tag "children" endpoint** — confirmed not worth building. `GET /domains/{id}/tags/{tagId}/children`
+  was in the original planned API surface but `TagsService.getTagTree` (builds the whole tree in one
+  call) already covers the UI need. The only cases where a scoped children-lookup would matter — a
+  future MCP/API consumer, or lazy-loaded tree UI at much larger tag counts — are both speculative
+  and cheap to add later on demand via ltree, not worth building ahead of an actual need.
 - **JSON `/query` RAG API** — dropped in favor of possibly exposing retrieval/chat as an MCP server
   later, rather than a REST API.
 - **Parent-child ("small-to-big") retrieval** — downgraded from planned to "interesting technique to
@@ -60,6 +51,16 @@ These need a decision before they can be scoped as real work:
 
 ## Recently completed
 
+- **Documents list is now a dense table, not a card grid.** `domain/documents.html` renders title,
+  author, tags, status, and actions as table columns (reusing the `.tags-table` CSS pattern already
+  established by `domain/tags.html`, broadened to `.tags-table, .documents-table` rather than
+  duplicating rules). Pagination and the existing title search were untouched — same
+  `@PageableDefault`/query logic as before, just a different row layout. `DocumentsViewController`
+  now also passes `tagsByPath` to the list page (previously only the detail page had it), so tag
+  pills can resolve ltree paths to names the same way the detail page already does.
+  Noted but not fixed (pre-existing, not introduced by this change): tag pills show the raw ltree
+  path instead of the resolved name on both the list and detail pages — `tagsByPath[tagPath]` isn't
+  resolving for at least some tags currently in use.
 - **`DocumentIngestionService` integration tests.** Real end-to-end coverage of the ingestion
   pipeline (Tika extraction → STRUCTURAL chunking → real `nomic-embed-text` embedding via local
   Ollama → Postgres/pgvector storage), in the new `integrationTest` Gradle source set (see "Gradle

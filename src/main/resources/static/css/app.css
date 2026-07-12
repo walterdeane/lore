@@ -398,7 +398,7 @@ h1, h2, h3 {
     gap: 0.5rem;
 }
 
-.tags-table {
+.tags-table, .documents-table {
     width: 100%;
     border-collapse: collapse;
     background: var(--surface);
@@ -407,7 +407,7 @@ h1, h2, h3 {
     overflow: hidden;
 }
 
-.tags-table th, .tags-table td {
+.tags-table th, .tags-table td, .documents-table th, .documents-table td {
     padding: 0.65rem 0.9rem;
     text-align: left;
     border-bottom: 1px solid var(--border);
@@ -415,7 +415,7 @@ h1, h2, h3 {
     vertical-align: top;
 }
 
-.tags-table th {
+.tags-table th, .documents-table th {
     color: var(--text-dim);
     font-weight: 500;
     font-size: 0.8rem;
@@ -423,19 +423,25 @@ h1, h2, h3 {
     letter-spacing: 0.03em;
 }
 
-.tags-table tbody tr:last-child td {
+.tags-table tbody tr:last-child td, .documents-table tbody tr:last-child td {
     border-bottom: none;
 }
 
-.tags-table tbody tr:hover {
+.tags-table tbody tr:hover, .documents-table tbody tr:hover {
     background: var(--surface-raised);
 }
 
-.tags-table-actions {
+.tags-table-actions, .documents-table-actions {
     display: flex;
     align-items: flex-start;
     gap: 0.6rem;
     white-space: nowrap;
+}
+
+.documents-table-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
 }
 
 .tag-cell-input {

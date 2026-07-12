@@ -41,10 +41,12 @@ class DocumentsViewController(
         @PageableDefault(size = 25, sort = ["title"]) pageable: Pageable,
         model: Model,
     ): String {
+        val availableTags = tagsService.getDomainTags(domainId)
         model.addAttribute("domain", domainsService.getDomainById(domainId))
         model.addAttribute("query", q)
         model.addAttribute("documentsPage", documentsService.getDocuments(domainId, q, pageable))
-        model.addAttribute("availableTags", tagsService.getDomainTags(domainId))
+        model.addAttribute("availableTags", availableTags)
+        model.addAttribute("tagsByPath", availableTags.associateBy { it.path })
         model.addAttribute("strategies", ChunkingStrategy.values())
         model.addAttribute("variants", StructuralVariant.values())
         return "domain/documents"
