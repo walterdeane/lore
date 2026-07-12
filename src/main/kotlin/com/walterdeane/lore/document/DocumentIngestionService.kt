@@ -55,21 +55,26 @@ class DocumentIngestionService(
             log.info("[{}] extracting text from {} using strategy {}", document.id, document.sourceFilename, strategy)
 
             val reader = TikaDocumentReader(FileSystemResource(document.sourcePath))
-            val pages = reader.get()
 
             log.info("[{}] chunking document", document.id)
             val tokenSplitter = TokenTextSplitter.builder().build()
-            fun tokenSplit() = tokenOverlapChunker.applyOverlap(tokenSplitter.split(pages), chunkingProperties.tokenOverlapChars)
+            // reader::get (Tika) is only called eagerly for TOKEN, which needs it unconditionally.
+            // STRUCTURAL/SEMANTIC extract via their own Jsoup-based markdown parsers and only fall
+            // back to Tika's pages if that comes back blank/insufficient — passing reader::get as a
+            // supplier rather than calling it upfront means a file Tika's strict parser chokes on
+            // (e.g. malformed XHTML) doesn't fail ingestion for a strategy that never needed Tika.
             val splitDocuments = when (strategy) {
-                ChunkingStrategy.TOKEN -> tokenSplit()
+                ChunkingStrategy.TOKEN ->
+                    tokenOverlapChunker.applyOverlap(tokenSplitter.split(reader.get()), chunkingProperties.tokenOverlapChars)
+
                 ChunkingStrategy.STRUCTURAL -> {
                     val variant = chunkingStrategyResolver.resolveVariant(document, domain)
                     log.info("[{}] STRUCTURAL variant: {}", document.id, variant)
-                    structuralTextSplitter.split(document.sourcePath, document.sourceType, pages, variant)
+                    structuralTextSplitter.split(document.sourcePath, document.sourceType, reader::get, variant)
                 }
 
                 ChunkingStrategy.SEMANTIC -> {
-                    symanticTextSplitter.split(document.sourcePath, document.sourceType, pages)
+                    symanticTextSplitter.split(document.sourcePath, document.sourceType, reader::get)
                 }
             }
 

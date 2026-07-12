@@ -128,7 +128,7 @@ class StructuralTextSplitterTest {
         val result = splitter.split(
             sourcePath = "/nonexistent/path/does-not-exist.epub",
             sourceType = SourceType.EPUB,
-            pages = listOf(Document(pageText)),
+            pages = { listOf(Document(pageText)) },
             variant = StructuralVariant.GENERIC,
         )
 
@@ -142,7 +142,7 @@ class StructuralTextSplitterTest {
         val result = splitter.split(
             sourcePath = "/nonexistent/path/does-not-exist.pdf",
             sourceType = SourceType.PDF,
-            pages = listOf(Document("   "), Document("")),
+            pages = { listOf(Document("   "), Document("")) },
             variant = StructuralVariant.GENERIC,
         )
 

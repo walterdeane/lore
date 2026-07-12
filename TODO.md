@@ -44,6 +44,20 @@ rationale — this file just tracks what's left and what's been decided.
 
 ## Recently completed
 
+- **Fixed ingestion failing outright on a Tika-incompatible file even under STRUCTURAL/SEMANTIC,
+  which never needed Tika's extraction in the first place.** Found via a real failed import
+  ("Thinking, Fast and Slow", a libgen.li-sourced EPUB) — `TIKA-237: Illegal SAXException`, root
+  cause a single malformed tag (`<divlity ...></div>`, a scraping/OCR artifact) in 1 of the book's 70
+  content files, tripping Tika's strict SAX parser. Confirmed via a scratch probe that
+  `EpubMarkdownParser` (Jsoup, lenient) extracts the entire 1.16M-character book fine, malformed tag
+  and all — the only reason ingestion failed was `DocumentIngestionService.ingest()` calling Tika's
+  `TikaDocumentReader.get()` unconditionally, before even branching on chunking strategy, even though
+  STRUCTURAL/SEMANTIC only use Tika's `pages` as a fallback when their own Jsoup-based markdown parse
+  comes back blank/insufficient. Fixed by changing `StructuralTextSplitter.split`/
+  `SymanticTextSplitter.split`'s `pages` parameter from `List<Document>` to `() -> List<Document>`
+  (`reader::get`), so Tika only actually runs for TOKEN (which needs it unconditionally) or for the
+  other two strategies' fallback path if it's ever reached. Re-verified against the real failing book
+  end-to-end: 496 chunks, ingestion completes.
 - **Fixed tag pills showing raw ltree paths instead of names.** Both `domain/documents.html` and
   `domain/document.html` resolved a document's tag paths to display names via
   `${tagsByPath[tagPath] != null ? tagsByPath[tagPath].name : tagPath}` — the bracket `[tagPath]`

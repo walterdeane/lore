@@ -46,10 +46,16 @@ class SymanticTextSplitter(
     private val log = LoggerFactory.getLogger(SymanticTextSplitter::class.java)
     private val oversizedChunkSplitter = TokenTextSplitter.builder().build()
 
+    /**
+     * [pages] is a supplier, not a value — see [StructuralTextSplitter.split]'s doc for why: it's
+     * only invoked in the fallback branch below, so a Tika extraction that would fail on this file
+     * (e.g. malformed XHTML Tika's strict parser rejects) never runs unless the markdown path
+     * (Jsoup, lenient) actually needs the fallback.
+     */
     fun split(
         sourcePath: String,
         sourceType: SourceType,
-        pages: List<Document>,
+        pages: () -> List<Document>,
         config: SemanticConfig = SemanticConfig(),
     ): List<Document> {
         val markdown = when (sourceType) {
@@ -61,7 +67,7 @@ class SymanticTextSplitter(
             extractParagraphs(markdown)
         } else {
             log.warn("markdown parser returned empty for {}, splitting paragraphs from raw page text", sourceType)
-            extractParagraphs(pages.joinToString("\n\n") { (it.text ?: "").trim() })
+            extractParagraphs(pages().joinToString("\n\n") { (it.text ?: "").trim() })
         }
 
         if (paragraphs.size < 3) {

@@ -65,9 +65,12 @@ class StructuralTextSplitter(
     /**
      * Primary entry point: parses the source file to markdown then splits on
      * heading markers. Falls back to heuristic text analysis if parsing fails
-     * or yields fewer than 3 chunks.
+     * or yields fewer than 3 chunks. [pages] is a supplier, not a value, so a caller whose primary
+     * extraction (Tika, via [pages]) is expensive or fragile only pays for/risks it when the
+     * markdown path actually needs the fallback — e.g. Tika's strict XML parser can reject a
+     * malformed-but-otherwise-fine EPUB that the markdown path (Jsoup, lenient) handles just fine.
      */
-    fun split(sourcePath: String, sourceType: SourceType, pages: List<Document>, variant: StructuralVariant): List<Document> {
+    fun split(sourcePath: String, sourceType: SourceType, pages: () -> List<Document>, variant: StructuralVariant): List<Document> {
         val config = configFor(variant)
 
         val markdown = when (sourceType) {
@@ -87,7 +90,7 @@ class StructuralTextSplitter(
             log.warn("[{}] markdown parser returned empty for {}, falling back to heuristic", variant, sourceType)
         }
 
-        return heuristicSplit(pages, variant, config)
+        return heuristicSplit(pages(), variant, config)
     }
 
     /** Legacy heuristic path — used as fallback when markdown parsing fails or under-chunks. */
