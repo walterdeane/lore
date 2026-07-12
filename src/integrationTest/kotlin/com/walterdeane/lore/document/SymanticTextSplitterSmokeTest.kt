@@ -3,7 +3,6 @@ package com.walterdeane.lore.document
 import com.walterdeane.lore.model.SourceType
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.springframework.ai.ollama.OllamaEmbeddingModel
 import org.springframework.ai.ollama.api.OllamaApi
 import org.springframework.ai.ollama.api.OllamaEmbeddingOptions
@@ -17,8 +16,8 @@ import kotlin.math.roundToInt
  * [SymanticTextSplitter]'s window size / breakpoint percentile produce sane chunk boundaries on a
  * real document, before wiring the class into [DocumentIngestionService]. Requires Ollama running
  * locally (`ollama serve`, with `nomic-embed-text` pulled) and at least one real EPUB/PDF sitting in
- * the configured documents directory, so it's off by default (`SMOKE=true` env var to run it) rather
- * than part of the normal unit-test suite.
+ * the configured documents directory, so it lives in the `integrationTest` source set — run via
+ * `./gradlew integrationTest`, not part of the normal `test` task.
  */
 class SymanticTextSplitterSmokeTest {
 
@@ -28,7 +27,6 @@ class SymanticTextSplitterSmokeTest {
      * [PdfMarkdownParser]'s furniture filters), without paying for the full embedding sweep. Point
      * it at a specific file with DOC_FILENAME_CONTAINS.
      */
-    @EnabledIfEnvironmentVariable(named = "SMOKE", matches = "true")
     @Test
     fun `check parsed markdown for repeated lines that look like leaked running headers`() {
         val docsDir = resolveDocsDir()
@@ -58,7 +56,6 @@ class SymanticTextSplitterSmokeTest {
     }
 
     /** Inspects raw running-header frequency counts directly, to see why a header did/didn't clear the threshold. */
-    @EnabledIfEnvironmentVariable(named = "SMOKE", matches = "true")
     @Test
     fun `dump running header frequency counts for a real PDF`() {
         val docsDir = resolveDocsDir()
@@ -97,7 +94,6 @@ class SymanticTextSplitterSmokeTest {
         println("total raw occurrences of 'meat hook meat book' substring across all bodies: $totalOccurrences")
     }
 
-    @EnabledIfEnvironmentVariable(named = "SMOKE", matches = "true")
     @Test
     fun `print paragraph, window, and breakpoint stats for a real document`() {
         val docsDir = resolveDocsDir()

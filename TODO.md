@@ -28,12 +28,15 @@ These need a decision before they can be scoped as real work:
   breakpoint detection (paragraph sliding windows → cosine distance between neighbors → per-document
   percentile threshold → cut, oversized chunks capped via `TokenTextSplitter` fallback). Defaults
   (`windowSize=2`, `breakpointPercentile=0.85`, `maxChunkChars=4000`) were tuned against a real
-  cookbook EPUB via `SymanticTextSplitterSmokeTest` (`SMOKE=true` env var, not part of the normal
-  suite — needs local Ollama running). Wired into `DocumentIngestionService`'s `SEMANTIC` branch.
+  cookbook EPUB via `SymanticTextSplitterSmokeTest`, now in the `integrationTest` source set (run via
+  `./gradlew integrationTest`, not part of the normal `test` task — needs local Ollama running).
+  Wired into `DocumentIngestionService`'s `SEMANTIC` branch.
 - **`DocumentIngestionService` integration tests.** Still no test for the actual end-to-end
-  ingestion pipeline (Tika extraction → chunk → embed → store) — that needs a real Postgres
-  (Testcontainers) and a real or stubbed embedding model, a bigger undertaking than the unit tests
-  just added for the pure logic pieces below. Not covered by this pass.
+  ingestion pipeline (Tika extraction → chunk → embed → store) — needs a real Postgres
+  (Testcontainers) and a real embedding model (real local Ollama, not stubbed — measured ~24ms/chunk
+  for `nomic-embed-text`, so even a few-hundred-page fixture stays well under a minute). The
+  `integrationTest` Gradle source set (see build.gradle.kts) now exists for this — same home as
+  `SymanticTextSplitterSmokeTest` — but the ingestion test itself isn't written yet.
 - **HyDE (Hypothetical Document Embeddings).** Pre-search query transformation: ask the chat LLM to
   generate a hypothetical answer to the query, then embed and search with that instead of (or
   alongside) the raw query — a hypothetical answer sits closer in embedding space to real answer

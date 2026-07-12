@@ -3,6 +3,7 @@ plugins {
 	kotlin("plugin.spring") version "2.1.0"
 	id("org.springframework.boot") version "4.1.0"
 	id("io.spring.dependency-management") version "1.1.7"
+	`jvm-test-suite`
 }
 
 group = "com.walterdeane"
@@ -75,4 +76,35 @@ kotlin {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+// Real-Postgres/real-Ollama tests: slow, need local infra, not part of `./gradlew build`/`check`.
+// Run explicitly with `./gradlew integrationTest`. Equivalent to what Failsafe was for in Maven.
+testing {
+	suites {
+		val integrationTest by registering(JvmTestSuite::class) {
+			useJUnitJupiter()
+			dependencies {
+				implementation(project())
+				runtimeOnly("org.junit.platform:junit-platform-launcher")
+			}
+			targets {
+				all {
+					testTask.configure {
+						shouldRunAfter(tasks.test)
+					}
+				}
+			}
+		}
+	}
+}
+
+// integrationTest (above) is a source set the jvm-test-suite plugin creates, not the built-in
+// "test" one, so it doesn't get Kotlin's automatic friend-module access to main's `internal`
+// declarations for free — associate it explicitly. Lazy `named(...)` (not `getByName`) since this
+// script runs top-to-bottom and the compilation is only created by the `testing` block above.
+kotlin {
+	target.compilations.named("integrationTest") {
+		associateWith(target.compilations.getByName("main"))
+	}
 }
