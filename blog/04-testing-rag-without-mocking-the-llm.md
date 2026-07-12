@@ -29,7 +29,7 @@ Desktop install that got reinstalled) before the real, deterministic cause was f
    - Why the split matters: tests needing real local infra (Testcontainers Postgres, local Ollama)
      need to stay out of the default `./gradlew build`/`check` path so CI/quick iteration isn't gated
      on Docker + a running Ollama instance.
-   - `SymanticTextSplitterSmokeTest` moved here, replacing an ad-hoc `SMOKE=true` env-var gate with the
+   - `SemanticTextSplitterSmokeTest` moved here, replacing an ad-hoc `SMOKE=true` env-var gate with the
      task split itself — a good example of formalizing an informal convention once it proves useful.
 
 3. **The Testcontainers singleton bug, in full**
@@ -53,16 +53,29 @@ Desktop install that got reinstalled) before the real, deterministic cause was f
      TOKEN never touches the markdown parsers at all, so it wouldn't exercise the outline-parsing/
      running-header logic the test exists to catch regressions in. Worth a beat on this: picking test
      inputs that actually exercise the code path you care about, not just "a" input.
-   - Assertions: chunk count, embedding dimensionality (768), BM25 `search_vector` population,
-     domain/tag denormalization — checking real properties of real output, not mock call counts.
+   - Assertions: chunk count, embedding dimensionality (768), full-text-search `search_vector`
+     population, domain/tag denormalization — checking real properties of real output, not mock call
+     counts.
 
 5. **The fixture that got rejected**
    - An archive.org-scanned EPUB was tried first but rejected as a fixture — Tika's own `EpubParser`
-     threw `EpubZipException` on it (not a strictly valid EPUB container per spec). Worth a short note
-     on why "a file happens to be broken" isn't the same bug as "my code doesn't handle valid input,"
-     and how to tell the difference when picking test fixtures.
+     threw `EpubZipException` on it (not a strictly valid EPUB container per spec). Same incident
+     covered in post 01 as an ingestion war story; here, reference it briefly rather than retelling —
+     the angle here is fixture selection ("a file happens to be broken" isn't the same bug as "my code
+     doesn't handle valid input," and how to tell the difference when picking test fixtures).
 
-6. **Takeaways**
+6. **The practical cost of real infra**
+   - State plainly how long `./gradlew integrationTest` actually takes to run locally (Testcontainers
+     Postgres startup + real Ollama embedding calls) — readers will want to know what this costs
+     before adopting the pattern.
+   - Address the obvious question directly: does this run in CI? As of this writing, no — there's no
+     CI workflow in this repo, and the suite needs local Ollama, so it's local-only. Say that plainly
+     rather than dodge it; "it doesn't, and here's why that's an acceptable tradeoff for a personal
+     project right now" is a fine, honest answer. If that changes later (e.g. a CI-hosted Ollama or a
+     stubbed embedding path for CI-only runs), that's a good candidate for a follow-up post, not a
+     retrofit of this one.
+
+7. **Takeaways**
    - For an AI pipeline specifically, real infra in an isolated, non-default test suite gives you
      confidence unit-mocked tests structurally cannot.
    - Intermittent test failures deserve a deterministic root cause before being written off as flaky —

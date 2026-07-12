@@ -96,7 +96,7 @@ Chunk
   └── belongs to a Document
   └── denormalised domainId (for filtered vector search)
   └── denormalised tagPaths array (for filtered vector search)
-  └── carries the embedding vector (pgvector) and a BM25 tsvector (generated column)
+  └── carries the embedding vector (pgvector) and a full-text-search tsvector (generated column)
   └── records which chunking strategy produced it
 
 Domain
@@ -124,7 +124,7 @@ Chunk
 
 id (UUID), documentId
 domainId (denormalised), tagPaths (denormalised ltree[] array)
-content (raw text), embedding (pgvector vector(768) type), a generated tsvector column for BM25
+content (raw text), embedding (pgvector vector(768) type), a generated tsvector column for full-text search
 chunkIndex, chunkStrategy
 pageNumber (nullable), tokenCount (nullable) — columns exist but nothing in the ingestion pipeline populates them yet; treat as reserved, not reliable
 createdAt
@@ -133,11 +133,11 @@ Denormalisation is deliberate — filtered vector similarity searches run a WHER
 
 Retrieval
 
-Search is hybrid, not pure vector similarity as originally sketched: BM25 (Postgres full-text
+Search is hybrid, not pure vector similarity as originally sketched: lexical search (Postgres full-text
 search) and pgvector cosine similarity run as two independent legs, each returning a candidate pool,
 fused by Reciprocal Rank Fusion. An optional LLM-based listwise reranking pass can run on top of the
 fused candidates before they're used (there's no local cross-encoder rerank endpoint to use instead).
-Every search result records which leg(s) surfaced it (BM25 / EMBEDDING / BOTH), useful for evaluating
+Every search result records which leg(s) surfaced it (LEXICAL / EMBEDDING / BOTH), useful for evaluating
 retrieval quality. See docs/CONFIGURATION.md for the tuning knobs (candidate pool size, RRF's k,
 reranking on/off).
 
@@ -185,13 +185,13 @@ GET    /api/documents/{id}/chunks    # JSON, intentional stub — no backing que
 
 Search & Chat (HTML, server-rendered — this replaces the planned /query and /query/search)
 
-GET    /search    # retrieval only (hybrid BM25 + vector), no LLM call — for inspecting what
+GET    /search    # retrieval only (hybrid lexical + vector), no LLM call — for inspecting what
                    # retrieval finds before an LLM ever sees it
 GET    /search/chunks/{chunkId}
 GET    /chat      # retrieval + generation: builds a prompt from the top (optionally reranked)
                    # chunks, asks the configured chat model, shows the answer with its sources
 
-GET    /api/search/bm25     # JSON, retrieval only, one leg
+GET    /api/search/lexical  # JSON, retrieval only, one leg
 GET    /api/search/hybrid   # JSON, retrieval only, fused
 
 Every route above is scoped to a single domain per request. There's no cross-domain query — see
@@ -204,5 +204,5 @@ Things to read before/while building
 Postgres ltree docs — @>, <@, ~, GiST indexing
 pgvector README — vector type, HNSW vs IVFFlat
 Spring AI reference — Ollama and Anthropic integration, the ETL/document pipeline, the vector store abstraction
-Reciprocal Rank Fusion — the fusion formula used to combine BM25 and vector search results
+Reciprocal Rank Fusion — the fusion formula used to combine lexical and vector search results
 Ollama model library — chat and embedding models

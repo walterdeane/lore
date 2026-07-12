@@ -11,7 +11,7 @@ import java.util.UUID
  * Semantic/"dense" retrieval: embeds the query with the same [EmbeddingModel] used at ingestion
  * time, then finds the nearest chunk embeddings in pgvector by cosine distance. Good at matching
  * meaning across different wording; blind to exact keyword/acronym matches, which is what
- * [BM25SearchService] contributes in the hybrid pipeline.
+ * [LexicalSearchService] contributes in the hybrid pipeline.
  */
 @Service
 class VectorSearchService(
@@ -27,7 +27,7 @@ class VectorSearchService(
         val chunkStrategy: ChunkingStrategy,
         val tagPaths: List<String>,
         val headline: String,
-        // 1 - cosine distance; higher means more similar, matching BM25's "higher rank is better" direction.
+        // 1 - cosine distance; higher means more similar, matching the lexical leg's "higher rank is better" direction.
         val similarity: Double,
         val documentTitle: String,
         val documentAuthor: String?,
@@ -36,7 +36,7 @@ class VectorSearchService(
     /**
      * Embeds [query] at request time and runs a pgvector nearest-neighbor search (`<=>` cosine
      * distance operator) against pre-computed chunk embeddings, scoped to [domainId] and optionally
-     * [tags]. Unlike [BM25SearchService] this has no native highlighting, so the excerpt is just a
+     * [tags]. Unlike [LexicalSearchService] this has no native highlighting, so the excerpt is just a
      * plain truncation of the chunk content (see [plainExcerpt]).
      */
     fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20): List<Result> {

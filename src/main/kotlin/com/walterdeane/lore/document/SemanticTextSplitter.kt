@@ -11,7 +11,7 @@ import kotlin.math.sqrt
 
 /**
  * `windowSize`/`breakpointPercentile` defaults come from sweeping a real cookbook EPUB (see
- * `SymanticTextSplitterSmokeTest`, `WINDOW_SIZES`/`PERCENTILES` env vars): p=0.95 badly
+ * `SemanticTextSplitterSmokeTest`, `WINDOW_SIZES`/`PERCENTILES` env vars): p=0.95 badly
  * under-segmented (5 chunks over 200 paragraphs, one 24K-char chunk); p=0.85 with windowSize=2 gave
  * the best count/size balance (14 chunks, avg 2550 chars) across all three window sizes tried.
  * `maxChunkChars` exists because no threshold eliminated one failure mode: a long span of
@@ -37,13 +37,13 @@ data class SemanticConfig(
  * is simpler to fall back safely than heading-detection heuristics are.
  */
 @Component
-class SymanticTextSplitter(
+class SemanticTextSplitter(
     private val epubMarkdownParser: EpubMarkdownParser,
     private val pdfMarkdownParser: PdfMarkdownParser,
     private val embeddingModel: EmbeddingModel,
 ) {
 
-    private val log = LoggerFactory.getLogger(SymanticTextSplitter::class.java)
+    private val log = LoggerFactory.getLogger(SemanticTextSplitter::class.java)
     private val oversizedChunkSplitter = TokenTextSplitter.builder().build()
 
     /**
@@ -79,7 +79,7 @@ class SymanticTextSplitter(
         // One embed() call per window rather than a single batched embed(List<String>): the local
         // Ollama runner serves embeddings from a single-slot process, and handing it a whole book's
         // worth of windows in one request timed out mid-processing during testing (see
-        // SymanticTextSplitterSmokeTest). Sequential calls are slower but reliable at book scale.
+        // SemanticTextSplitterSmokeTest). Sequential calls are slower but reliable at book scale.
         val embeddings = windows.map { embeddingModel.embed(it) }
         val distances = (0 until embeddings.size - 1).map { i -> 1.0 - cosineSimilarity(embeddings[i], embeddings[i + 1]) }
         val threshold = percentile(distances, config.breakpointPercentile)

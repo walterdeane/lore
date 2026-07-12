@@ -98,7 +98,7 @@ lore:
   Any resulting chunk over a size cap is split further with `TokenTextSplitter` as a backstop, since
   a long span of internally-similar content (e.g. a conversion table) can otherwise never trigger a
   cut. Tuning (window size, threshold percentile, size cap) isn't yet exposed as configuration —
-  see `SymanticTextSplitter.SemanticConfig` in the source.
+  see `SemanticTextSplitter.SemanticConfig` in the source.
 
 ### Structural variants
 
@@ -121,7 +121,7 @@ lore:
     rrf-k: 60
 ```
 
-- **`candidate-pool-size`** — how many results each of BM25 and vector search retrieve independently
+- **`candidate-pool-size`** — how many results each of the lexical (full-text) and vector search legs retrieve independently
   before being fused. The fused result set (and therefore pagination) is bounded by this pool — it's
   RAG-style top-K retrieval, not exhaustive search-engine pagination, so results won't grow past the
   pool no matter how deep you page.
@@ -177,7 +177,7 @@ a publicly-exposed deployment without reconsidering.
 | `lore.chat.rerank-enabled` | `false` | Enable LLM-based listwise reranking before generation. |
 | `lore.chunking.default-strategy` | `TOKEN` | App-wide fallback chunking strategy. |
 | `lore.chunking.token-overlap-chars` | `200` | Trailing-context overlap for TOKEN chunking, in characters; `0` disables it. |
-| `lore.search.candidate-pool-size` | `50` | Candidates retrieved per leg (BM25, vector) before fusion. |
+| `lore.search.candidate-pool-size` | `50` | Candidates retrieved per leg (lexical, vector) before fusion. |
 | `lore.search.rrf-k` | `60` | The `k` constant in Reciprocal Rank Fusion. |
 | `lore.storage.documents-dir` | `~/lore-data/documents` | Where original uploaded files are kept. |
 | `spring.ai.ollama.embedding.model` | `nomic-embed-text` | Local embedding model name. |

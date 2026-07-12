@@ -40,7 +40,7 @@ data class Document(
 
 /**
  * The unit of retrieval: a slice of a document's text plus its precomputed [embedding] vector.
- * Both [content] (for BM25/display) and [embedding] (for vector search) live on the same row so
+ * Both [content] (for lexical search/display) and [embedding] (for vector search) live on the same row so
  * hybrid search can hydrate either result type from one table.
  */
 data class Chunk(
@@ -57,7 +57,7 @@ data class Chunk(
     val createdAt: Instant,
 )
 
-/** TOKEN: fixed-size splitting ([org.springframework.ai.transformer.splitter.TokenTextSplitter]). STRUCTURAL: heading-aware (see [com.walterdeane.lore.document.StructuralTextSplitter]). SEMANTIC: embedding-similarity breakpoint detection (see [com.walterdeane.lore.document.SymanticTextSplitter]). */
+/** TOKEN: fixed-size splitting ([org.springframework.ai.transformer.splitter.TokenTextSplitter]). STRUCTURAL: heading-aware (see [com.walterdeane.lore.document.StructuralTextSplitter]). SEMANTIC: embedding-similarity breakpoint detection (see [com.walterdeane.lore.document.SemanticTextSplitter]). */
 enum class ChunkingStrategy { TOKEN, SEMANTIC, STRUCTURAL }
 
 /** Shapes the STRUCTURAL splitter's heuristics for a given document type (see [com.walterdeane.lore.document.BoundaryConfig]). */

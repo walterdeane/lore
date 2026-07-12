@@ -64,7 +64,7 @@ The app is then available at **http://localhost:8080**.
    use the quick-add tag form right on the document upload page. Tags let you scope search/chat to
    a subset of a domain's documents.
 4. Try **[/search](http://localhost:8080/search)** — pick the domain, type a query. This is
-   retrieval only (hybrid BM25 + vector search), no LLM call, useful for seeing what the retrieval
+   retrieval only (hybrid full-text + vector search), no LLM call, useful for seeing what the retrieval
    pipeline actually finds before an LLM ever sees it.
 5. Try **[/chat](http://localhost:8080/chat)** — same retrieval, but the results are fed to the chat
    model as context and it answers your question, with the source chunks shown alongside the answer

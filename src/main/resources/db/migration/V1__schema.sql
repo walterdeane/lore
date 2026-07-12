@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS ltree;
 
--- Strip basic markdown syntax before BM25 indexing.
+-- Strip basic markdown syntax before full-text-search indexing.
 CREATE OR REPLACE FUNCTION strip_markdown(input text) RETURNS text
     LANGUAGE sql IMMUTABLE STRICT AS
 $$

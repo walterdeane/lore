@@ -12,7 +12,7 @@ import java.util.UUID
  * [HybridSearchService] merges the two.
  */
 @Service
-class BM25SearchService(private val jdbcTemplate: JdbcTemplate) {
+class LexicalSearchService(private val jdbcTemplate: JdbcTemplate) {
 
     data class Result(
         val chunkId: UUID,

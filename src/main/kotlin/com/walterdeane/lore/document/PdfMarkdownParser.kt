@@ -18,7 +18,7 @@ private data class PdfLine(val text: String, val fontSize: Float, val startsNewP
  * rendered glyph height of each line and infers heading levels from font-size ratios relative to the
  * document's median line — rougher, but a PDF with no outline has no better signal to use. Either
  * way the output is markdown good enough for [StructuralTextSplitter]/[MarkdownChunker]/
- * [SymanticTextSplitter] to split on.
+ * [SemanticTextSplitter] to split on.
  */
 @Component
 class PdfMarkdownParser {
@@ -120,7 +120,7 @@ class PdfMarkdownParser {
      * (`012-015_30591.indd`), press-run stamps (`(Fogra 39)Job:05-30591...`), and repeated running
      * headers ([detectRunningHeaders]) — and pads short lines with runs of spaces to preserve column
      * alignment. Left alone, each of those becomes its own spurious "paragraph" once split on blank
-     * lines downstream (see [SymanticTextSplitter.extractParagraphs]).
+     * lines downstream (see [SemanticTextSplitter.extractParagraphs]).
      */
     private fun cleanLayoutExtractedBody(text: String, runningHeaders: Set<String> = emptySet()): String =
         text.lines()

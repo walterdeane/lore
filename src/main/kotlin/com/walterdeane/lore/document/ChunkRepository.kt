@@ -11,7 +11,7 @@ import java.util.UUID
 
 /**
  * Raw JDBC access to the `chunk` table — the unit of retrieval in this RAG system. Each row holds
- * both the chunk's text (for BM25/display) and its embedding vector (for pgvector similarity
+ * both the chunk's text (for lexical search/display) and its embedding vector (for pgvector similarity
  * search), so a single table serves both halves of [com.walterdeane.lore.search.HybridSearchService].
  */
 @Repository

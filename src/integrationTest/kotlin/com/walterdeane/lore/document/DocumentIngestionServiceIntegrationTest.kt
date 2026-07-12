@@ -105,7 +105,7 @@ class DocumentIngestionServiceIntegrationTest : AbstractIntegrationTest() {
             assertTrue((row["content_len"] as Number).toInt() > 0, "chunk content should not be blank")
             assertEquals(ChunkingStrategy.STRUCTURAL.name, row["chunk_strategy"])
             assertEquals(domain.id.toString(), row["domain_id"].toString())
-            assertEquals(true, row["has_tsvector"], "BM25 search_vector generated column should populate")
+            assertEquals(true, row["has_tsvector"], "full-text-search search_vector generated column should populate")
         }
     }
 

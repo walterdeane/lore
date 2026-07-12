@@ -13,13 +13,13 @@ import kotlin.math.roundToInt
 
 /**
  * Not a real assertion-based test — a diagnostic runner for eyeballing whether
- * [SymanticTextSplitter]'s window size / breakpoint percentile produce sane chunk boundaries on a
+ * [SemanticTextSplitter]'s window size / breakpoint percentile produce sane chunk boundaries on a
  * real document, before wiring the class into [DocumentIngestionService]. Requires Ollama running
  * locally (`ollama serve`, with `nomic-embed-text` pulled) and at least one real EPUB/PDF sitting in
  * the configured documents directory, so it lives in the `integrationTest` source set — run via
  * `./gradlew integrationTest`, not part of the normal `test` task.
  */
-class SymanticTextSplitterSmokeTest {
+class SemanticTextSplitterSmokeTest {
 
     /**
      * Fast, embedding-free check: parses a PDF/EPUB to markdown and reports any line that still
@@ -109,7 +109,7 @@ class SymanticTextSplitterSmokeTest {
             .options(OllamaEmbeddingOptions.builder().model("nomic-embed-text").build())
             .build()
 
-        val splitter = SymanticTextSplitter(EpubMarkdownParser(), PdfMarkdownParser(), embeddingModel)
+        val splitter = SemanticTextSplitter(EpubMarkdownParser(), PdfMarkdownParser(), embeddingModel)
 
         val markdown = when (sourceType) {
             SourceType.EPUB -> EpubMarkdownParser().parse(file.path)

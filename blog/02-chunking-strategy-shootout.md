@@ -32,15 +32,16 @@ see the difference before you explain the mechanism.
      (<3) — worth explaining why a fallback is necessary at all (not every source parses cleanly).
    - The PDF outline story: prefers the document's real embedded outline/TOC over guessing headings
      from font size, because font-based heuristics are fooled by production artifacts (stamps, stray
-     glyphs) — a good place to link back to the "what breaks" post without repeating it in full.
+     glyphs) — link back to post 01 ("What Breaks...") for the full story rather than repeating it.
 
 4. **SEMANTIC — embedding-similarity breakpoints**
    - Mechanism: paragraph sliding windows → cosine distance between neighboring windows → per-
      document percentile threshold → cut at the biggest semantic jumps.
    - Oversized chunks capped via `TokenTextSplitter` as a fallback within the fallback.
    - Defaults (`windowSize=2`, `breakpointPercentile=0.85`, `maxChunkChars=4000`) were tuned against a
-     real cookbook — worth showing what "tuned" actually meant in practice (what looked wrong at the
-     wrong percentile, what looked right).
+     real cookbook — don't just assert this was tuned, show it: include an actual bad chunk boundary
+     produced at a wrong percentile (e.g. `0.95`, badly under-chunking) side by side with the good
+     boundary at `0.85` on the same passage.
    - This is the most conceptually interesting strategy and probably deserves the most space: explain
      *why* a percentile-based per-document threshold beats a fixed distance cutoff (documents vary
      wildly in how "choppy" their semantic content is).
@@ -50,6 +51,11 @@ see the difference before you explain the mechanism.
      fixtures) and show actual chunk boundaries from all three strategies side by side.
    - Be honest about where each one wins/loses — this is more credible than declaring one strategy
      universally best.
+   - The title promises a "shootout," so this section needs to actually score something, not just
+     describe three strategies again: a small comparison table (chunk count, average/median chunk
+     size per strategy) plus an informal retrieval spot-check — run the same 3 real queries against
+     all three strategies' chunk sets and note which strategy's chunks actually come back. This is a
+     data-gathering task before drafting, not something to write from memory.
 
 6. **When to reach for which**
    - Practical guidance: TOKEN as a safe universal default, STRUCTURAL for well-organized documents
@@ -57,7 +63,8 @@ see the difference before you explain the mechanism.
      is thin or inconsistent but content still has topical shifts (narrative, transcripts).
 
 ## Possible closing note
-Acknowledge this is per-document-type tuning, not a solved problem — a natural segue to mention
-`chunkingStrategyResolver` picking variants, and that this is exactly the kind of thing agentic
-follow-up retrieval (a deferred TODO) might one day compensate for at query time rather than ingest
-time.
+Acknowledge this is per-document-type tuning, not a solved problem — close on `chunkingStrategyResolver`
+picking variants per document, and the open question of whether that resolution should get smarter
+over time (more variants, learned thresholds) rather than staying a fixed set of hand-tuned defaults.
+(Retrieval-time fixes like HyDE/agentic follow-up retrieval belong to post 03, not here — this post
+stays scoped to ingest-time chunking.)

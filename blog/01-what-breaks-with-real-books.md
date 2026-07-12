@@ -2,10 +2,9 @@
 
 ## Angle
 Every RAG tutorial ingests a clean PDF or two and calls it done. This post is the opposite: a log of
-what actually happened when I pointed the ingestion pipeline at real, messy, real-world files —
-libgen EPUBs, archive.org scans, professionally typeset cookbooks — and what each failure taught me
-about the gap between "works in my test suite" and "works on the internet's actual files."
-Recommended lead post: most concrete, most shareable, lowest context needed from readers.
+what actually happened when I pointed the ingestion pipeline at real, messy, real-world files — EPUBs
+of varying provenance, archive.org scans, professionally typeset cookbooks — and what each failure
+taught me about the gap between "works in my test suite" and "works on the internet's actual files."
 
 ## Hook
 Open cold with the "Thinking, Fast and Slow" failure: a single malformed `<divlity>` tag, a scraping/
@@ -64,5 +63,5 @@ the book was wrong.
    code runs; testing against the wild tells you where your assumptions live.
 
 ## Possible closing note
-Tee up the testing post (topic 4) — mention these bugs are also why the integration-test suite exists
+Tee up the testing post (04) — mention these bugs are also why the integration-test suite exists
 against real fixture files rather than mocks.

@@ -11,7 +11,7 @@ rationale — this file just tracks what's left and what's been decided.
   chunks than the bare question does. Complements the existing post-search LLM reranking rather
   than replacing it (see `RerankerService`). Not yet designed — where it'd hook into
   `HybridSearchService`, whether it's on by default or a toggle like `rerank-enabled`, and how it
-  interacts with the BM25 leg (which wants the literal query terms, not a paraphrase) all need
+  interacts with the lexical leg (which wants the literal query terms, not a paraphrase) all need
   thought.
 
 - **Agentic follow-up retrieval.** After the first retrieval+rerank pass, let the LLM decide whether
@@ -19,7 +19,7 @@ rationale — this file just tracks what's left and what's been decided.
   results — useful for multi-hop/broad questions that one retrieval pass doesn't fully cover, a
   different failure mode than HyDE's vocabulary-mismatch problem above. Rated a better bet than HyDE:
   it targets an incomplete-retrieval gap the current single-pass pipeline can't address at all, versus
-  HyDE's recall gain being unproven given BM25 + reranking already cover a lot of that ground. Needs a
+  HyDE's recall gain being unproven given the lexical leg + reranking already cover a lot of that ground. Needs a
   hard cap on follow-up rounds (2-3 max) to bound latency/cost, and ideally the "enough context?"
   decision folded into a call the LLM is already making (e.g. alongside answer generation) rather than
   a separate LLM round-trip, so it doesn't stack a third LLM hop on top of reranking. Not yet
@@ -56,6 +56,17 @@ rationale — this file just tracks what's left and what's been decided.
 
 ## Recently completed
 
+- **Renamed `BM25SearchService` → `LexicalSearchService` and `SearchType.BM25` → `LEXICAL`** (plus the
+  `/api/search/bm25` route → `/api/search/lexical`), across code, tests, and docs (README/PRD/
+  docs/SETUP.md/docs/CONFIGURATION.md). The implementation is Postgres full-text search
+  (`tsvector`/`ts_rank_cd` against a `plainto_tsquery`) — real lexical/keyword matching, but not the
+  Okapi BM25 algorithm specifically (no term-frequency saturation or document-length normalization),
+  so the old name overclaimed what the leg actually does. Surfaced while drafting a blog post about
+  the hybrid search architecture — writing the explanation out for an external audience is what
+  exposed the name was a claim, not just a label. Also fixed a genuine typo in the same pass:
+  `SymanticTextSplitter`/`SymanticTextSplitterSmokeTest` → `SemanticTextSplitter`/
+  `SemanticTextSplitterSmokeTest` (was inconsistent with the correctly-spelled `SemanticConfig` in the
+  same file).
 - **Fixed ingestion failing outright on a Tika-incompatible file even under STRUCTURAL/SEMANTIC,
   which never needed Tika's extraction in the first place.** Found via a real failed import
   ("Thinking, Fast and Slow", a libgen.li-sourced EPUB) — `TIKA-237: Illegal SAXException`, root
@@ -66,7 +77,7 @@ rationale — this file just tracks what's left and what's been decided.
   `TikaDocumentReader.get()` unconditionally, before even branching on chunking strategy, even though
   STRUCTURAL/SEMANTIC only use Tika's `pages` as a fallback when their own Jsoup-based markdown parse
   comes back blank/insufficient. Fixed by changing `StructuralTextSplitter.split`/
-  `SymanticTextSplitter.split`'s `pages` parameter from `List<Document>` to `() -> List<Document>`
+  `SemanticTextSplitter.split`'s `pages` parameter from `List<Document>` to `() -> List<Document>`
   (`reader::get`), so Tika only actually runs for TOKEN (which needs it unconditionally) or for the
   other two strategies' fallback path if it's ever reached. Re-verified against the real failing book
   end-to-end: 496 chunks, ingestion completes.
@@ -79,11 +90,11 @@ rationale — this file just tracks what's left and what's been decided.
   populated data all the way down through the JDBC layer — a genuine SpringEL/Thymeleaf quirk with
   bracket-indexer syntax on a `Map<String, _>` keyed by a dynamic String containing dots, not a data
   or repository bug. Fixed by switching both templates to explicit `.get(tagPath)` calls.
-- **SEMANTIC chunking strategy** — `SymanticTextSplitter` implements embedding-similarity breakpoint
+- **SEMANTIC chunking strategy** — `SemanticTextSplitter` implements embedding-similarity breakpoint
   detection (paragraph sliding windows → cosine distance between neighbors → per-document percentile
   threshold → cut, oversized chunks capped via `TokenTextSplitter` fallback). Defaults
   (`windowSize=2`, `breakpointPercentile=0.85`, `maxChunkChars=4000`) were tuned against a real
-  cookbook EPUB via `SymanticTextSplitterSmokeTest`, now in the `integrationTest` source set (run via
+  cookbook EPUB via `SemanticTextSplitterSmokeTest`, now in the `integrationTest` source set (run via
   `./gradlew integrationTest`, not part of the normal `test` task — needs local Ollama running).
   Wired into `DocumentIngestionService`'s `SEMANTIC` branch.
 - **Documents list is now a dense table, not a card grid.** `domain/documents.html` renders title,
@@ -99,7 +110,7 @@ rationale — this file just tracks what's left and what's been decided.
   `integrationTest` suite" below). `DocumentIngestionServiceIntegrationTest` ingests two checked-in
   public-domain fixtures — `fda-bad-bug-book-2nd-ed.pdf` (FDA "Bad Bug Book", 2nd ed.; 292 pages,
   real embedded outline) and `jekyll-and-hyde.epub` (Standard Ebooks) — and asserts on chunk count,
-  embedding dimensionality (768), BM25 `search_vector` population, and domain/tag denormalization.
+  embedding dimensionality (768), full-text-search `search_vector` population, and domain/tag denormalization.
   Both fixtures use STRUCTURAL explicitly rather than the app's TOKEN default, since TOKEN never
   touches `PdfMarkdownParser`/`EpubMarkdownParser` at all (a separate Tika → `TokenTextSplitter`
   path) and so wouldn't exercise the outline-parsing/running-header-stripping logic this test exists
@@ -122,7 +133,7 @@ rationale — this file just tracks what's left and what's been decided.
 - **Gradle `integrationTest` suite.** Added the `jvm-test-suite` plugin with a dedicated
   `integrationTest` source set/task — the modern Gradle equivalent of Maven's Surefire/Failsafe
   split, for tests needing real local infra (Postgres via Testcontainers, local Ollama) that should
-  stay out of `./gradlew build`/`check`. `SymanticTextSplitterSmokeTest` moved here from `src/test`,
+  stay out of `./gradlew build`/`check`. `SemanticTextSplitterSmokeTest` moved here from `src/test`,
   replacing its ad-hoc `SMOKE=true` env-var gate with the task split itself.
 - **`PdfMarkdownParser` now prefers a PDF's real embedded outline/TOC over guessing headings from
   font size.** Found while smoke-testing the semantic splitter against a real PDF ("Great Meat"):
@@ -196,7 +207,7 @@ rationale — this file just tracks what's left and what's been decided.
 - Fixed the document title/author/source-path edit form (was posting `_method=update`, not a real
   HTTP verb `HiddenHttpMethodFilter` recognizes, so it silently 405'd — added the missing
   `@PutMapping` handler and fixed the form to send `_method=put`).
-- Hybrid BM25 + vector search fused with Reciprocal Rank Fusion, plus optional LLM-based listwise
+- Hybrid lexical + vector search fused with Reciprocal Rank Fusion, plus optional LLM-based listwise
   reranking.
 - Three chunking strategies: TOKEN (with configurable overlap), STRUCTURAL (heading-aware, with
   GENERIC/COOKBOOK/ACADEMIC variants), SEMANTIC (embedding-similarity breakpoint detection — see
@@ -206,7 +217,7 @@ rationale — this file just tracks what's left and what's been decided.
   files, and browser-zipped folder-style EPUB bundles (e.g. Apple Books exports).
 - Friendly error page and catch-all exception handling (no more raw Whitelabel pages); configurable
   upload size limit.
-- `SearchType` (BM25/EMBEDDING/BOTH) surfaced per result, wired into the search UI, for
+- `SearchType` (LEXICAL/EMBEDDING/BOTH) surfaced per result, wired into the search UI, for
   retrieval-accuracy evaluation.
 - Full server-rendered UI (domains, tags, documents, search, chat) — see PRD.md's API Surface
   section for what replaced the original JSON-API plan.

@@ -8,7 +8,7 @@ local-first-with-a-Claude-escape-hatch design, so later posts can dive straight 
 testing without re-explaining the basics.
 
 ## Hook
-Not a bug story this time (that's post 2) — open with the actual motivating problem: a personal
+Not a bug story this time (that's post 01) — open with the actual motivating problem: a personal
 library of hobby references (cookbooks, brewing texts, woodworking manuals, lutherie guides,
 permaculture texts) that's easy to *own* and hard to *query* — you know the answer is in one of these
 books somewhere, but not which one, or which page. That's the gap Lore closes.
@@ -23,6 +23,9 @@ books somewhere, but not which one, or which page. That's the gap Lore closes.
      (LangChain/LlamaIndex); a clean Spring Boot + Kotlin + Spring AI local-RAG example is
      underrepresented. Personal tool first, reference implementation second — don't lead with this,
      but it's worth a mention for the audience most likely to read a Spring/Kotlin blog.
+   - Lead visual for this section: a screenshot of the actual chat UI — question, generated answer,
+     cited source chunks. Worth more here than the domain-model diagram below; show the receipts
+     before explaining the plumbing.
 
 2. **The domain model, briefly, with a diagram**
    - Domain (a theme: Brewing, Cookbooks, Woodworking, Lutherie, Permaculture) → Documents → Chunks,
@@ -43,10 +46,11 @@ books somewhere, but not which one, or which page. That's the gap Lore closes.
      material. Validating "does the right chunk come back for this query" as its own testable,
      inspectable thing, independent of generation, catches retrieval problems where they're cheap to
      see and fix.
-   - This is also where BM25 entered before vector/hybrid search — start with a well-understood,
-     inspectable, classic retrieval method, confirm the plumbing (ingestion → storage → query →
-     ranked results) end-to-end, *then* layer in embeddings and fusion once the foundation is proven.
-   - *Diagram 2:* a simple pipeline/timeline diagram showing the build order: ingest → BM25 search →
+   - This is also where lexical/keyword search (Postgres full-text search) entered before vector/
+     hybrid search — start with a well-understood, inspectable, classic retrieval method, confirm the
+     plumbing (ingestion → storage → query → ranked results) end-to-end, *then* layer in embeddings
+     and fusion once the foundation is proven.
+   - *Diagram 2:* a simple pipeline/timeline diagram showing the build order: ingest → lexical search →
      add vector search → hybrid fusion (RRF) → add LLM reranking → add chat/generation on top. Framing
      it as layers added over time, not a single architecture that appeared all at once.
 
@@ -61,13 +65,19 @@ books somewhere, but not which one, or which page. That's the gap Lore closes.
    - Frame this as a deliberate two-tier decision rather than "local, except when I gave up": the
      boundary is drawn specifically at chat generation because that's where model capability gaps show
      up most, while embedding quality differences matter much less for retrieval at this scale.
+   - The sharper architectural justification for *why* the line sits exactly there: swapping the chat
+     model is a config change, but swapping the embedding model means re-embedding the entire corpus,
+     since vectors from different models aren't comparable — embeddings are a one-way lock-in in a way
+     chat generation simply isn't. That asymmetry, not just "chat quality varies more," is why the
+     swappable boundary is drawn where it is.
    - *Diagram 3 (optional):* a small diagram showing the provider boundary — embeddings always → local
      Ollama; chat → local Ollama *or* Anthropic, behind the same interface.
 
 5. **What's ahead in this series**
-   - Short signpost paragraph previewing the other four posts (chunking strategies, real-world
-     ingestion failures, hybrid search architecture, testing without mocking the LLM) so this post
-     functions as a table of contents as well as an introduction.
+   - Short signpost paragraph previewing the other four posts in publication order: 01 (what breaks
+     ingesting real books), 02 (the chunking strategy shootout), 03 (hybrid search architecture), 04
+     (testing a RAG pipeline without mocking the LLM) — so this post functions as a table of contents
+     as well as an introduction.
 
 ## Possible closing note
 End on the "personal tool that might become a reference implementation" framing from section 1 — invite

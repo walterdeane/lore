@@ -10,16 +10,16 @@ class HybridSearchServiceTest {
     @Test
     fun `chunk present in both legs outranks one present in only one`() {
         val inBoth = UUID.randomUUID()
-        val bm25Only = UUID.randomUUID()
+        val lexicalOnly = UUID.randomUUID()
         val vectorOnly = UUID.randomUUID()
 
-        val bm25 = listOf(inBoth, bm25Only)
+        val lexical = listOf(inBoth, lexicalOnly)
         val vector = listOf(inBoth, vectorOnly)
 
-        val fused = fuse(bm25, vector)
+        val fused = fuse(lexical, vector)
 
         assertEquals(inBoth, fused.first().first)
-        assertTrue(fused.map { it.first }.containsAll(listOf(bm25Only, vectorOnly)))
+        assertTrue(fused.map { it.first }.containsAll(listOf(lexicalOnly, vectorOnly)))
     }
 
     @Test
@@ -28,7 +28,7 @@ class HybridSearchServiceTest {
         val b = UUID.randomUUID()
         val k = 60
 
-        val fused = fuse(bm25 = listOf(a, b), vector = listOf(b), k = k)
+        val fused = fuse(lexical = listOf(a, b), vector = listOf(b), k = k)
         val scores = fused.toMap()
 
         assertEquals(1.0 / (k + 1), scores[a])

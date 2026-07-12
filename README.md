@@ -23,8 +23,9 @@ Lore ingests EPUB and PDF documents, splits them into chunks, embeds them, and l
 chat over them, scoped by **domain** (a top-level theme, e.g. "Cookbooks" or "Brewing") and
 hierarchical **tags** (e.g. `cuisine.italian.northern`) within a domain.
 
-- **Hybrid search** — BM25 (keyword) and pgvector (semantic) search run independently and are
-  fused with Reciprocal Rank Fusion, so results benefit from both exact-term and paraphrase matches.
+- **Hybrid search** — Postgres full-text search (keyword) and pgvector (semantic) search run
+  independently and are fused with Reciprocal Rank Fusion, so results benefit from both exact-term
+  and paraphrase matches.
 - **Optional LLM reranking** — an extra listwise reranking pass over the fused candidates before
   they're used, since there's no local cross-encoder rerank endpoint to lean on.
 - **RAG chat** — retrieves relevant chunks for a question, stuffs them into the model's context, and

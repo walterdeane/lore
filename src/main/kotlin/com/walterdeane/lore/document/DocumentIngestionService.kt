@@ -19,7 +19,7 @@ import java.util.UUID
  * The ingestion half of the RAG pipeline: turns an uploaded [Document] into searchable [Chunk] rows.
  * Steps are: (1) extract raw text with Tika, (2) split it into chunks using the resolved
  * [ChunkingStrategy], (3) embed each chunk's text with [EmbeddingModel], (4) persist chunk text +
- * embedding to Postgres/pgvector. Everything downstream — [com.walterdeane.lore.search.BM25SearchService],
+ * embedding to Postgres/pgvector. Everything downstream — [com.walterdeane.lore.search.LexicalSearchService],
  * [com.walterdeane.lore.search.VectorSearchService] — reads what this writes.
  */
 @Service
@@ -30,7 +30,7 @@ class DocumentIngestionService(
     private val domainRepository: DomainRepository,
     private val chunkingStrategyResolver: ChunkingStrategyResolver,
     private val structuralTextSplitter: StructuralTextSplitter,
-    private val symanticTextSplitter: SymanticTextSplitter,
+    private val semanticTextSplitter: SemanticTextSplitter,
     private val tokenOverlapChunker: TokenOverlapChunker,
     private val chunkingProperties: ChunkingProperties,
 ) {
@@ -74,7 +74,7 @@ class DocumentIngestionService(
                 }
 
                 ChunkingStrategy.SEMANTIC -> {
-                    symanticTextSplitter.split(document.sourcePath, document.sourceType, reader::get)
+                    semanticTextSplitter.split(document.sourcePath, document.sourceType, reader::get)
                 }
             }
 
