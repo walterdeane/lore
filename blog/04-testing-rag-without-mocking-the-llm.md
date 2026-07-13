@@ -29,6 +29,11 @@ Desktop install that got reinstalled) before the real, deterministic cause was f
    - Why the split matters: tests needing real local infra (Testcontainers Postgres, local Ollama)
      need to stay out of the default `./gradlew build`/`check` path so CI/quick iteration isn't gated
      on Docker + a running Ollama instance.
+   - Close the obvious follow-up question right here, don't let it wait: **does this run in CI?** No —
+     there's no CI workflow in this repo today, and the suite needs local Ollama, so it's a pre-release
+     local gate, not a CI gate. State the actual runtime cost too (time `./gradlew integrationTest` on
+     your machine — Testcontainers Postgres startup + real Ollama embedding calls — and give the real
+     number). Two sentences, stated plainly, closes the hole before a reader has to ask.
    - `SemanticTextSplitterSmokeTest` moved here, replacing an ad-hoc `SMOKE=true` env-var gate with the
      task split itself — a good example of formalizing an informal convention once it proves useful.
 
@@ -64,18 +69,7 @@ Desktop install that got reinstalled) before the real, deterministic cause was f
      the angle here is fixture selection ("a file happens to be broken" isn't the same bug as "my code
      doesn't handle valid input," and how to tell the difference when picking test fixtures).
 
-6. **The practical cost of real infra**
-   - State plainly how long `./gradlew integrationTest` actually takes to run locally (Testcontainers
-     Postgres startup + real Ollama embedding calls) — readers will want to know what this costs
-     before adopting the pattern.
-   - Address the obvious question directly: does this run in CI? As of this writing, no — there's no
-     CI workflow in this repo, and the suite needs local Ollama, so it's local-only. Say that plainly
-     rather than dodge it; "it doesn't, and here's why that's an acceptable tradeoff for a personal
-     project right now" is a fine, honest answer. If that changes later (e.g. a CI-hosted Ollama or a
-     stubbed embedding path for CI-only runs), that's a good candidate for a follow-up post, not a
-     retrofit of this one.
-
-7. **Takeaways**
+6. **Takeaways**
    - For an AI pipeline specifically, real infra in an isolated, non-default test suite gives you
      confidence unit-mocked tests structurally cannot.
    - Intermittent test failures deserve a deterministic root cause before being written off as flaky —
