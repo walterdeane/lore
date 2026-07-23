@@ -5,6 +5,7 @@ import com.walterdeane.lore.model.Chunk
 import com.walterdeane.lore.model.ChunkingStrategy
 import com.walterdeane.lore.model.Document
 import com.walterdeane.lore.model.IngestionStatus
+import com.walterdeane.lore.model.SourceType
 import org.slf4j.LoggerFactory
 import org.springframework.ai.embedding.EmbeddingModel
 import org.springframework.ai.reader.tika.TikaDocumentReader
@@ -33,6 +34,8 @@ class DocumentIngestionService(
     private val semanticTextSplitter: SemanticTextSplitter,
     private val tokenOverlapChunker: TokenOverlapChunker,
     private val chunkingProperties: ChunkingProperties,
+    private val epubMarkdownParser: EpubMarkdownParser,
+    private val pdfMarkdownParser: PdfMarkdownParser,
 ) {
     private val log = LoggerFactory.getLogger(DocumentIngestionService::class.java)
 
@@ -57,15 +60,30 @@ class DocumentIngestionService(
             val reader = TikaDocumentReader(FileSystemResource(document.sourcePath))
 
             log.info("[{}] chunking document", document.id)
-            val tokenSplitter = TokenTextSplitter.builder().build()
-            // reader::get (Tika) is only called eagerly for TOKEN, which needs it unconditionally.
+            val tokenSplitter = TokenTextSplitter.builder().withChunkSize(chunkingProperties.tokenChunkSize).build()
             // STRUCTURAL/SEMANTIC extract via their own Jsoup-based markdown parsers and only fall
             // back to Tika's pages if that comes back blank/insufficient — passing reader::get as a
             // supplier rather than calling it upfront means a file Tika's strict parser chokes on
             // (e.g. malformed XHTML) doesn't fail ingestion for a strategy that never needed Tika.
+            // TOKEN used to call reader.get() unconditionally with no such fallback, so a real book
+            // (a single malformed tag in a scraped EPUB triggering TIKA-237) failed outright even
+            // though the same file ingests fine under STRUCTURAL/SEMANTIC — that asymmetry is why
+            // TOKEN now falls back to the same lenient markdown parser on a Tika failure.
             val splitDocuments = when (strategy) {
-                ChunkingStrategy.TOKEN ->
-                    tokenOverlapChunker.applyOverlap(tokenSplitter.split(reader.get()), chunkingProperties.tokenOverlapChars)
+                ChunkingStrategy.TOKEN -> {
+                    val tikaDocuments = try {
+                        reader.get()
+                    } catch (e: Exception) {
+                        log.warn("[{}] Tika failed for TOKEN strategy ({}), falling back to markdown parser",
+                            document.id, e.message)
+                        val markdown = when (document.sourceType) {
+                            SourceType.EPUB -> epubMarkdownParser.parse(document.sourcePath)
+                            SourceType.PDF -> pdfMarkdownParser.parse(document.sourcePath)
+                        }
+                        listOf(org.springframework.ai.document.Document(markdown))
+                    }
+                    tokenOverlapChunker.applyOverlap(tokenSplitter.split(tikaDocuments), chunkingProperties.tokenOverlapChars)
+                }
 
                 ChunkingStrategy.STRUCTURAL -> {
                     val variant = chunkingStrategyResolver.resolveVariant(document, domain)

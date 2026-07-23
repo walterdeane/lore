@@ -10,7 +10,9 @@ import kotlin.test.assertTrue
 
 class StructuralTextSplitterTest {
 
-    private val splitter = StructuralTextSplitter(EpubMarkdownParser(), PdfMarkdownParser(), MarkdownChunker())
+    private val splitter = StructuralTextSplitter(
+        EpubMarkdownParser(), PdfMarkdownParser(), MarkdownChunker(), TokenOverlapChunker(), ChunkingProperties(),
+    )
 
     // --- configFor: per-variant boundary tuning -----------------------------------------------
 

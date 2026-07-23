@@ -109,7 +109,7 @@ class SemanticTextSplitterSmokeTest {
             .options(OllamaEmbeddingOptions.builder().model("nomic-embed-text").build())
             .build()
 
-        val splitter = SemanticTextSplitter(EpubMarkdownParser(), PdfMarkdownParser(), embeddingModel)
+        val splitter = SemanticTextSplitter(EpubMarkdownParser(), PdfMarkdownParser(), embeddingModel, ChunkingProperties())
 
         val markdown = when (sourceType) {
             SourceType.EPUB -> EpubMarkdownParser().parse(file.path)

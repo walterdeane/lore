@@ -41,10 +41,11 @@ class SemanticTextSplitter(
     private val epubMarkdownParser: EpubMarkdownParser,
     private val pdfMarkdownParser: PdfMarkdownParser,
     private val embeddingModel: EmbeddingModel,
+    private val chunkingProperties: ChunkingProperties,
 ) {
 
     private val log = LoggerFactory.getLogger(SemanticTextSplitter::class.java)
-    private val oversizedChunkSplitter = TokenTextSplitter.builder().build()
+    private val oversizedChunkSplitter = TokenTextSplitter.builder().withChunkSize(chunkingProperties.tokenChunkSize).build()
 
     /**
      * [pages] is a supplier, not a value — see [StructuralTextSplitter.split]'s doc for why: it's

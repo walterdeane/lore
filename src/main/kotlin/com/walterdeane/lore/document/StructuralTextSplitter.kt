@@ -4,11 +4,15 @@ import com.walterdeane.lore.model.SourceType
 import com.walterdeane.lore.model.StructuralVariant
 import org.slf4j.LoggerFactory
 import org.springframework.ai.document.Document
+import org.springframework.ai.transformer.splitter.TokenTextSplitter
 import org.springframework.stereotype.Component
 
 data class BoundaryConfig(
     val maxTitleLength: Int = 80,
     val minChunkChars: Int = 200,
+    // Same default as SemanticConfig.maxChunkChars, so TOKEN/STRUCTURAL/SEMANTIC chunks land in a
+    // comparable size range regardless of strategy — see StructuralTextSplitter.capOversizedChunks.
+    val maxChunkChars: Int = 4000,
     val allowNumberedSections: Boolean = true,
     val excludedHeaders: Set<String> = emptySet(),
     // Preferred markdown heading level to split on (## = 2).
@@ -30,9 +34,12 @@ class StructuralTextSplitter(
     private val epubMarkdownParser: EpubMarkdownParser,
     private val pdfMarkdownParser: PdfMarkdownParser,
     private val markdownChunker: MarkdownChunker,
+    private val tokenOverlapChunker: TokenOverlapChunker,
+    private val chunkingProperties: ChunkingProperties,
 ) {
 
     private val log = LoggerFactory.getLogger(StructuralTextSplitter::class.java)
+    private val oversizedChunkSplitter = TokenTextSplitter.builder().withChunkSize(chunkingProperties.tokenChunkSize).build()
 
     companion object {
         private val NUMBERED_SECTION = Regex("""^\d+(\.\d+)*\.?\s+[A-ZÀ-ÿ]""")
@@ -78,23 +85,51 @@ class StructuralTextSplitter(
             SourceType.PDF -> pdfMarkdownParser.parse(sourcePath)
         }
 
-        if (markdown.isNotBlank()) {
-            val chunks = markdownChunker.split(markdown, config.markdownHeadingLevel, config.minChunkChars, config.excludedHeaders)
-            if (chunks.size >= 3) {
-                log.info("[{}] markdown chunking: {} chunks from {}", variant, chunks.size, sourceType)
-                return chunks.map { Document(it) }
+        val chunks = if (markdown.isNotBlank()) {
+            val markdownChunks = markdownChunker.split(markdown, config.markdownHeadingLevel, config.minChunkChars, config.excludedHeaders)
+            if (markdownChunks.size >= 3) {
+                log.info("[{}] markdown chunking: {} chunks from {}", variant, markdownChunks.size, sourceType)
+                markdownChunks
+            } else {
+                log.warn("[{}] markdown chunking produced only {} chunks for {}, falling back to heuristic",
+                    variant, markdownChunks.size, sourceType)
+                heuristicSplit(pages(), variant, config)
             }
-            log.warn("[{}] markdown chunking produced only {} chunks for {}, falling back to heuristic",
-                variant, chunks.size, sourceType)
         } else {
             log.warn("[{}] markdown parser returned empty for {}, falling back to heuristic", variant, sourceType)
+            heuristicSplit(pages(), variant, config)
         }
 
-        return heuristicSplit(pages(), variant, config)
+        return capOversizedChunks(chunks, config.maxChunkChars).map { Document(it) }
+    }
+
+    /**
+     * A heading-bounded chunk's size is bounded only by where headings happen to fall — a document
+     * whose real structure is coarser than expected (chapter-level headings only, no per-recipe/
+     * per-section markers) can produce a single chunk spanning tens of thousands of characters,
+     * which embeds as one diluted vector no more useful for retrieval than not chunking at all.
+     * Anything over [maxChars] is split further with the same plain token+overlap splitter the
+     * TOKEN strategy uses — not [SemanticTextSplitter], which would give STRUCTURAL a new
+     * embedding-model dependency it doesn't otherwise need — and each resulting piece is
+     * re-prefixed with the original heading line so it doesn't lose which section it came from.
+     */
+    internal fun capOversizedChunks(chunks: List<String>, maxChars: Int): List<String> =
+        chunks.flatMap { text -> if (text.length > maxChars) splitOversizedChunk(text) else listOf(text) }
+
+    private fun splitOversizedChunk(text: String): List<String> {
+        val firstLine = text.lineSequence().firstOrNull { it.isNotBlank() } ?: ""
+        val heading = firstLine.takeIf { it.startsWith("#") } ?: ""
+        val body = if (heading.isBlank()) text else text.removePrefix(firstLine).trimStart('\n', ' ')
+
+        val split = tokenOverlapChunker.applyOverlap(
+            oversizedChunkSplitter.split(Document(body)),
+            chunkingProperties.tokenOverlapChars,
+        )
+        return split.mapNotNull { it.text }.map { sub -> if (heading.isBlank()) sub else "$heading\n\n$sub" }
     }
 
     /** Legacy heuristic path — used as fallback when markdown parsing fails or under-chunks. */
-    private fun heuristicSplit(pages: List<Document>, variant: StructuralVariant, config: BoundaryConfig): List<Document> {
+    private fun heuristicSplit(pages: List<Document>, variant: StructuralVariant, config: BoundaryConfig): List<String> {
         val rawSegments = mutableListOf<String>()
         for (page in pages) {
             val text = (page.text ?: "").trim()
@@ -104,7 +139,7 @@ class StructuralTextSplitter(
         val merged = mergeShort(rawSegments, config.minChunkChars)
         log.info("[{}] heuristic split: {} pages → {} raw → {} chunks",
             variant, pages.size, rawSegments.size, merged.size)
-        return merged.filter { it.isNotBlank() }.map { Document(it) }
+        return merged.filter { it.isNotBlank() }
     }
 
     /** Groups raw page lines into segments, starting a new one wherever [isHeadingInContext]/[couldBeHeading] fires. */
