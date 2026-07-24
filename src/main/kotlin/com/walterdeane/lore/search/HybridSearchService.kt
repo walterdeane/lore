@@ -103,11 +103,14 @@ class HybridSearchService(
 
         val (vectorParam, _) = timedStage(log, "vector_embed", query) { toVectorParam(query) }
         val tagClause = tagFilterClause(tags)
+        val useOrFallback = shouldUseLexicalOrFallback(jdbcTemplate, query, domainId, tags, searchProperties.lexicalFallbackEnabled)
+        val tsqueryFromItem = lexicalTsqueryFromItem(useOrFallback)
+        val tsqueryExpr = lexicalTsqueryExpr(useOrFallback)
 
         val sql = """
-            WITH ${candidateCtesSql(tagClause)}
+            WITH ${candidateCtesSql(tagClause, tsqueryFromItem)}
             SELECT c.id, c.document_id, c.domain_id, c.chunk_index, c.chunk_strategy, c.tag_paths,
-                   ts_headline('english', c.content, plainto_tsquery('english', ?), 'MaxWords=35, MinWords=15') AS headline,
+                   ts_headline('english', c.content, $tsqueryExpr, 'MaxWords=35, MinWords=15') AS headline,
                    fused.rrf_score, fused.search_type,
                    d.title AS document_title, d.author AS document_author,
                    COUNT(*) OVER() AS total_count
@@ -144,7 +147,7 @@ class HybridSearchService(
         // zero rows) leaves no row to read a total from — matches old behavior (fuse()'s full size
         // was known before slicing to the page) via a direct count of the same CTEs, only when needed.
         if (results.isEmpty()) {
-            total = countFused(query, vectorParam, domainId, tags, poolSize)
+            total = countFused(query, vectorParam, domainId, tags, poolSize, tsqueryFromItem)
         }
 
         return SearchPage(results, total, page, size)
@@ -156,11 +159,11 @@ class HybridSearchService(
     }
 
     /** Shared `lex`/`vec` candidate-ranking CTEs for [search] and [countFused] — see [search]'s KDoc for the mechanism. */
-    private fun candidateCtesSql(tagClause: String): String = """
+    private fun candidateCtesSql(tagClause: String, tsqueryFromItem: String): String = """
         lex_ranked AS (
-            SELECT c.id, ROW_NUMBER() OVER (ORDER BY ts_rank_cd(c.search_vector, q) DESC) AS pos
-            FROM chunk c, plainto_tsquery('english', ?) q
-            WHERE c.search_vector @@ q
+            SELECT c.id, ROW_NUMBER() OVER (ORDER BY ts_rank_cd(c.search_vector, q.q) DESC) AS pos
+            FROM chunk c, $tsqueryFromItem q
+            WHERE c.search_vector @@ q.q
               AND c.domain_id = ?
               $tagClause
         ),
@@ -203,19 +206,25 @@ class HybridSearchService(
         }
 
     /** Fallback total when [search]'s main query returns zero rows (an out-of-range page) — see the comment at its call site. */
-    private fun countFused(query: String, vectorParam: PGobject, domainId: UUID, tags: List<String>?, poolSize: Int): Long {
+    private fun countFused(query: String, vectorParam: PGobject, domainId: UUID, tags: List<String>?, poolSize: Int, tsqueryFromItem: String): Long {
         val tagClause = tagFilterClause(tags)
-        val sql = "WITH ${candidateCtesSql(tagClause)} SELECT COUNT(*) FROM fused"
+        val sql = "WITH ${candidateCtesSql(tagClause, tsqueryFromItem)} SELECT COUNT(*) FROM fused"
         val args = candidateCteArgs(query, vectorParam, domainId, tags, poolSize, searchProperties.rrfK)
         return jdbcTemplate.queryForObject(sql, Long::class.java, *args.toTypedArray()) ?: 0L
     }
 
     /**
      * The post-03 capture harness (`post-03-data-capture-spec.md`): returns per-leg candidate lists
-     * with positions/scores, the fused list, per-stage timings, and the raw `plainto_tsquery` output
-     * for [query] — everything [search] computes and discards, made visible instead of hidden behind
+     * with positions/scores, the fused list, per-stage timings, and the resolved tsquery text for
+     * [query] — everything [search] computes and discards, made visible instead of hidden behind
      * one fused [SearchPage]. Deliberately a separate method rather than a flag on [search] so the
      * normal path's return type/behavior can't drift by accident.
+     *
+     * [ExplainResult.tsqueryText] reflects Phase 2.2: whatever [search] would actually run —
+     * `websearch_to_tsquery`, or the OR-fallback form when the AND form finds nothing and
+     * [SearchProperties.lexicalFallbackEnabled] is on — not the plain `plainto_tsquery` output. A
+     * capture wanting to see *why* the fallback triggered can diff this against
+     * `websearch_to_tsquery('english', ?)::text` directly.
      */
     fun explain(query: String, domainId: UUID, tags: List<String>? = null): ExplainResult {
         val poolSize = searchProperties.candidatePoolSize
@@ -244,8 +253,9 @@ class HybridSearchService(
         }
         timings["hydrate"] = hydrateMs
 
+        val useOrFallback = shouldUseLexicalOrFallback(jdbcTemplate, query, domainId, tags, searchProperties.lexicalFallbackEnabled)
         val tsqueryText = jdbcTemplate.queryForObject(
-            "SELECT plainto_tsquery('english', ?)::text", String::class.java, query,
+            "SELECT ${lexicalTsqueryExpr(useOrFallback)}::text", String::class.java, query,
         ) ?: ""
 
         return ExplainResult(

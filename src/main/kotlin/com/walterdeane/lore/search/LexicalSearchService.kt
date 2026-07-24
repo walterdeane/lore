@@ -13,7 +13,10 @@ import java.util.UUID
  * [HybridSearchService] merges the two.
  */
 @Service
-class LexicalSearchService(private val jdbcTemplate: JdbcTemplate) {
+class LexicalSearchService(
+    private val jdbcTemplate: JdbcTemplate,
+    private val searchProperties: SearchProperties,
+) {
 
     private val log = LoggerFactory.getLogger(LexicalSearchService::class.java)
 
@@ -45,9 +48,12 @@ class LexicalSearchService(private val jdbcTemplate: JdbcTemplate) {
     }
 
     /**
-     * Ranks chunks in [domainId] by Postgres's `ts_rank_cd` against a `plainto_tsquery` built from
-     * [query], optionally restricted to chunks under [tags] (see [tagFilterClause]). Also returns a
-     * highlighted excerpt (`ts_headline`) so result lists can show why a chunk matched.
+     * Ranks chunks in [domainId] by Postgres's `ts_rank_cd` against a `websearch_to_tsquery` built
+     * from [query] — falling back to the same lexemes ORed together instead of ANDed when that
+     * finds nothing and [SearchProperties.lexicalFallbackEnabled] is on (post-03 2.2; see
+     * [shouldUseLexicalOrFallback]) — optionally restricted to chunks under [tags] (see
+     * [tagFilterClause]). Also returns a highlighted excerpt (`ts_headline`) so result lists can
+     * show why a chunk matched.
      */
     fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage =
         searchTimed(query, domainId, tags, size, page).page
@@ -55,17 +61,19 @@ class LexicalSearchService(private val jdbcTemplate: JdbcTemplate) {
     /** Same as [search], but also returns the SQL execution time — see [TimedResult]. */
     fun searchTimed(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): TimedResult {
         val tagClause = tagFilterClause(tags)
+        val useOrFallback = shouldUseLexicalOrFallback(jdbcTemplate, query, domainId, tags, searchProperties.lexicalFallbackEnabled)
+        val tsqueryFromItem = lexicalTsqueryFromItem(useOrFallback)
 
         val sql = """
             SELECT c.id, c.document_id, c.domain_id, c.chunk_index, c.chunk_strategy, c.tag_paths,
-                   ts_rank_cd(c.search_vector, q) AS rank,
-                   ts_headline('english', c.content, q, 'MaxWords=35, MinWords=15') AS headline,
+                   ts_rank_cd(c.search_vector, q.q) AS rank,
+                   ts_headline('english', c.content, q.q, 'MaxWords=35, MinWords=15') AS headline,
                    COUNT(*) OVER() AS total_count,
                    d.title AS document_title, d.author AS document_author
             FROM chunk c
             JOIN document d ON d.id = c.document_id,
-            plainto_tsquery('english', ?) q
-            WHERE c.search_vector @@ q
+            $tsqueryFromItem q
+            WHERE c.search_vector @@ q.q
               AND c.domain_id = ?
               $tagClause
             ORDER BY rank DESC
