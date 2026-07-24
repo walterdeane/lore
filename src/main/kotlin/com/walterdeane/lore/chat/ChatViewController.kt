@@ -5,6 +5,8 @@ import com.walterdeane.lore.document.MarkdownRenderer
 import com.walterdeane.lore.domain.DomainsService
 import com.walterdeane.lore.search.HybridSearchService
 import com.walterdeane.lore.search.RerankerService
+import com.walterdeane.lore.search.timedStage
+import org.slf4j.LoggerFactory
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.stereotype.Controller
 import org.springframework.ui.Model
@@ -44,6 +46,7 @@ class ChatViewController(
     private val chatProperties: ChatProperties,
 ) {
 
+    private val log = LoggerFactory.getLogger(ChatViewController::class.java)
     private val chatClient = chatClientBuilder.build()
 
     /**
@@ -77,11 +80,13 @@ class ChatViewController(
             val context = sources.joinToString("\n\n") { result ->
                 "### ${result.documentTitle}\n${contentByChunk.getValue(result.chunkId)}"
             }
-            val answer = chatClient.prompt()
-                .system(SYSTEM_PROMPT.format(context))
-                .user(q)
-                .call()
-                .content() ?: ""
+            val (answer, _) = timedStage(log, "chat_generate", q) {
+                chatClient.prompt()
+                    .system(SYSTEM_PROMPT.format(context))
+                    .user(q)
+                    .call()
+                    .content() ?: ""
+            }
             model.addAttribute("contentHtml", markdownRenderer.toHtml(answer))
             model.addAttribute("sources", sources)
         }

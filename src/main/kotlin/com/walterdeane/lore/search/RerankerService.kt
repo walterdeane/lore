@@ -1,5 +1,6 @@
 package com.walterdeane.lore.search
 
+import org.slf4j.LoggerFactory
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.stereotype.Service
 
@@ -38,6 +39,7 @@ internal fun parseRerankOrder(response: String, candidateCount: Int): List<Int> 
 @Service
 class RerankerService(chatClientBuilder: ChatClient.Builder) {
 
+    private val log = LoggerFactory.getLogger(RerankerService::class.java)
     private val chatClient = chatClientBuilder.build()
 
     /**
@@ -52,12 +54,23 @@ class RerankerService(chatClientBuilder: ChatClient.Builder) {
         val listing = candidates.withIndex().joinToString("\n\n") { (i, candidate) ->
             "[$i] ${contentOf(candidate).take(MAX_PASSAGE_CHARS)}"
         }
-        val response = chatClient.prompt()
-            .user(RERANK_PROMPT.format(query, listing))
-            .call()
-            .content() ?: ""
+        val (response, rerankMs) = timedStage(log, "rerank_llm", query) {
+            chatClient.prompt()
+                .user(RERANK_PROMPT.format(query, listing))
+                .call()
+                .content() ?: ""
+        }
 
         val order = parseRerankOrder(response, candidates.size)
+        val fallbackTriggered = order.isEmpty()
+        // Post-03 observability (1.3): the raw response and parsed order are what actually needs
+        // debugging when a model doesn't follow the "ONLY a JSON array" instruction — logged verbatim
+        // rather than summarized, since a truncated/reformatted response would hide the failure mode.
+        log.info(
+            "rerank candidateCount={} topK={} ms={} fallbackTriggered={} parsedOrder={} rawResponse={}",
+            candidates.size, topK, rerankMs, fallbackTriggered, order, response,
+        )
+
         val ranked = order.map { candidates[it] }
         return ranked.ifEmpty { candidates }.take(topK)
     }

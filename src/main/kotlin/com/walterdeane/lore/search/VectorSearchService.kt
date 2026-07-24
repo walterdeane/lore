@@ -2,6 +2,7 @@ package com.walterdeane.lore.search
 
 import com.walterdeane.lore.model.ChunkingStrategy
 import org.postgresql.util.PGobject
+import org.slf4j.LoggerFactory
 import org.springframework.ai.embedding.EmbeddingModel
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
@@ -18,6 +19,11 @@ class VectorSearchService(
     private val jdbcTemplate: JdbcTemplate,
     private val embeddingModel: EmbeddingModel,
 ) {
+
+    private val log = LoggerFactory.getLogger(VectorSearchService::class.java)
+
+    /** [embedMs]/[sqlMs] are the post-03 instrumentation hook — [HybridSearchService.explain] surfaces them structurally. */
+    data class TimedResult(val results: List<Result>, val embedMs: Long, val sqlMs: Long)
 
     data class Result(
         val chunkId: UUID,
@@ -39,10 +45,16 @@ class VectorSearchService(
      * [tags]. Unlike [LexicalSearchService] this has no native highlighting, so the excerpt is just a
      * plain truncation of the chunk content (see [plainExcerpt]).
      */
-    fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20): List<Result> {
-        val vectorParam = PGobject().apply {
-            type = "vector"
-            value = embeddingModel.embed(query).joinToString(",", "[", "]")
+    fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20): List<Result> =
+        searchTimed(query, domainId, tags, size).results
+
+    /** Same as [search], but also returns the embed/SQL split timing — see [TimedResult]. */
+    fun searchTimed(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20): TimedResult {
+        val (vectorParam, embedMs) = timedStage(log, "vector_embed", query) {
+            PGobject().apply {
+                type = "vector"
+                value = embeddingModel.embed(query).joinToString(",", "[", "]")
+            }
         }
         val tagClause = tagFilterClause(tags)
 
@@ -67,20 +79,24 @@ class VectorSearchService(
             add(size)
         }.toTypedArray()
 
-        return jdbcTemplate.query(sql, { rs, _ ->
-            Result(
-                chunkId = rs.getObject("id", UUID::class.java),
-                documentId = rs.getObject("document_id", UUID::class.java),
-                domainId = rs.getObject("domain_id", UUID::class.java),
-                chunkIndex = rs.getInt("chunk_index"),
-                chunkStrategy = ChunkingStrategy.valueOf(rs.getString("chunk_strategy")),
-                tagPaths = (rs.getArray("tag_paths").array as Array<*>).map { it.toString() },
-                headline = plainExcerpt(rs.getString("content")),
-                similarity = rs.getDouble("similarity"),
-                documentTitle = rs.getString("document_title"),
-                documentAuthor = rs.getString("document_author"),
-            )
-        }, *args)
+        val (results, sqlMs) = timedStage(log, "vector_sql", query) {
+            jdbcTemplate.query(sql, { rs, _ ->
+                Result(
+                    chunkId = rs.getObject("id", UUID::class.java),
+                    documentId = rs.getObject("document_id", UUID::class.java),
+                    domainId = rs.getObject("domain_id", UUID::class.java),
+                    chunkIndex = rs.getInt("chunk_index"),
+                    chunkStrategy = ChunkingStrategy.valueOf(rs.getString("chunk_strategy")),
+                    tagPaths = (rs.getArray("tag_paths").array as Array<*>).map { it.toString() },
+                    headline = plainExcerpt(rs.getString("content")),
+                    similarity = rs.getDouble("similarity"),
+                    documentTitle = rs.getString("document_title"),
+                    documentAuthor = rs.getString("document_author"),
+                )
+            }, *args)
+        }
+
+        return TimedResult(results, embedMs, sqlMs)
     }
 }
 

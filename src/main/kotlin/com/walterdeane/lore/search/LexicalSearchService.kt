@@ -1,6 +1,7 @@
 package com.walterdeane.lore.search
 
 import com.walterdeane.lore.model.ChunkingStrategy
+import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import java.util.UUID
@@ -13,6 +14,11 @@ import java.util.UUID
  */
 @Service
 class LexicalSearchService(private val jdbcTemplate: JdbcTemplate) {
+
+    private val log = LoggerFactory.getLogger(LexicalSearchService::class.java)
+
+    /** [sqlMs] is the post-03 instrumentation hook — [HybridSearchService.explain] surfaces it structurally. */
+    data class TimedResult(val page: SearchPage, val sqlMs: Long)
 
     data class Result(
         val chunkId: UUID,
@@ -43,7 +49,11 @@ class LexicalSearchService(private val jdbcTemplate: JdbcTemplate) {
      * [query], optionally restricted to chunks under [tags] (see [tagFilterClause]). Also returns a
      * highlighted excerpt (`ts_headline`) so result lists can show why a chunk matched.
      */
-    fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage {
+    fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage =
+        searchTimed(query, domainId, tags, size, page).page
+
+    /** Same as [search], but also returns the SQL execution time — see [TimedResult]. */
+    fun searchTimed(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): TimedResult {
         val tagClause = tagFilterClause(tags)
 
         val sql = """
@@ -71,22 +81,24 @@ class LexicalSearchService(private val jdbcTemplate: JdbcTemplate) {
         }.toTypedArray()
 
         var total = 0L
-        val results = jdbcTemplate.query(sql, { rs, rowNum ->
-            if (rowNum == 0) total = rs.getLong("total_count")
-            Result(
-                chunkId = rs.getObject("id", UUID::class.java),
-                documentId = rs.getObject("document_id", UUID::class.java),
-                domainId = rs.getObject("domain_id", UUID::class.java),
-                chunkIndex = rs.getInt("chunk_index"),
-                chunkStrategy = ChunkingStrategy.valueOf(rs.getString("chunk_strategy")),
-                tagPaths = (rs.getArray("tag_paths").array as Array<*>).map { it.toString() },
-                headline = rs.getString("headline"),
-                rank = rs.getDouble("rank"),
-                documentTitle = rs.getString("document_title"),
-                documentAuthor = rs.getString("document_author"),
-            )
-        }, *args)
+        val (results, sqlMs) = timedStage(log, "lexical_sql", query) {
+            jdbcTemplate.query(sql, { rs, rowNum ->
+                if (rowNum == 0) total = rs.getLong("total_count")
+                Result(
+                    chunkId = rs.getObject("id", UUID::class.java),
+                    documentId = rs.getObject("document_id", UUID::class.java),
+                    domainId = rs.getObject("domain_id", UUID::class.java),
+                    chunkIndex = rs.getInt("chunk_index"),
+                    chunkStrategy = ChunkingStrategy.valueOf(rs.getString("chunk_strategy")),
+                    tagPaths = (rs.getArray("tag_paths").array as Array<*>).map { it.toString() },
+                    headline = rs.getString("headline"),
+                    rank = rs.getDouble("rank"),
+                    documentTitle = rs.getString("document_title"),
+                    documentAuthor = rs.getString("document_author"),
+                )
+            }, *args)
+        }
 
-        return SearchPage(results, total, page, size)
+        return TimedResult(SearchPage(results, total, page, size), sqlMs)
     }
 }

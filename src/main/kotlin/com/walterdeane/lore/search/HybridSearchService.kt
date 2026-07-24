@@ -1,6 +1,7 @@
 package com.walterdeane.lore.search
 
 import com.walterdeane.lore.model.ChunkingStrategy
+import org.slf4j.LoggerFactory
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.PreparedStatementSetter
 import org.springframework.jdbc.core.RowMapper
@@ -33,6 +34,8 @@ class HybridSearchService(
     private val jdbcTemplate: JdbcTemplate,
     private val searchProperties: SearchProperties,
 ) {
+
+    private val log = LoggerFactory.getLogger(HybridSearchService::class.java)
 
     data class Result(
         val chunkId: UUID,
@@ -78,14 +81,70 @@ class HybridSearchService(
         val lexicalIds = lexicalSearchService.search(query, domainId, tags, size = poolSize, page = 0).results.map { it.chunkId }
         val vectorIds = vectorSearchService.search(query, domainId, tags, size = poolSize).map { it.chunkId }
 
-        val fused = fuse(lexicalIds, vectorIds, searchProperties.rrfK)
+        val (fused, _) = timedStage(log, "fuse", query) { fuse(lexicalIds, vectorIds, searchProperties.rrfK) }
         val total = fused.size.toLong()
         val pageIds = fused.drop(page * size).take(size)
         if (pageIds.isEmpty()) return SearchPage(emptyList(), total, page, size)
 
-        val hydrated = hydrate(pageIds.map { it.first }, query, lexicalIds.toSet(), vectorIds.toSet())
+        val (hydrated, _) = timedStage(log, "hydrate", query) {
+            hydrate(pageIds.map { it.first }, query, lexicalIds.toSet(), vectorIds.toSet())
+        }
         val results = pageIds.mapNotNull { (id, score) -> hydrated[id]?.copy(rank = score) }
         return SearchPage(results, total, page, size)
+    }
+
+    /**
+     * The post-03 capture harness (`post-03-data-capture-spec.md`): returns per-leg candidate lists
+     * with positions/scores, the fused list, per-stage timings, and the raw `plainto_tsquery` output
+     * for [query] — everything [search] computes and discards, made visible instead of hidden behind
+     * one fused [SearchPage]. Deliberately a separate method rather than a flag on [search] so the
+     * normal path's return type/behavior can't drift by accident.
+     */
+    fun explain(query: String, domainId: UUID, tags: List<String>? = null): ExplainResult {
+        val poolSize = searchProperties.candidatePoolSize
+        val timings = LinkedHashMap<String, Long>()
+
+        // searchTimed already logs "lexical_sql"/"vector_embed"/"vector_sql" internally — call it
+        // directly rather than wrapping again here, so the explain response and the log trail agree
+        // on one number per stage instead of two similar-but-not-identical ones.
+        val lexicalTimed = lexicalSearchService.searchTimed(query, domainId, tags, size = poolSize, page = 0)
+        timings["lexical_sql"] = lexicalTimed.sqlMs
+
+        val vectorTimed = vectorSearchService.searchTimed(query, domainId, tags, size = poolSize)
+        timings["vector_embed"] = vectorTimed.embedMs
+        timings["vector_sql"] = vectorTimed.sqlMs
+
+        val lexicalIds = lexicalTimed.page.results.map { it.chunkId }
+        val vectorIds = vectorTimed.results.map { it.chunkId }
+        val lexicalIdSet = lexicalIds.toSet()
+        val vectorIdSet = vectorIds.toSet()
+
+        val (fused, fuseMs) = timedStage(log, "fuse", query) { fuse(lexicalIds, vectorIds, searchProperties.rrfK) }
+        timings["fuse"] = fuseMs
+
+        val (_, hydrateMs) = timedStage(log, "hydrate", query) {
+            hydrate(fused.map { it.first }, query, lexicalIdSet, vectorIdSet)
+        }
+        timings["hydrate"] = hydrateMs
+
+        val tsqueryText = jdbcTemplate.queryForObject(
+            "SELECT plainto_tsquery('english', ?)::text", String::class.java, query,
+        ) ?: ""
+
+        return ExplainResult(
+            lexical = lexicalTimed.page.results.mapIndexed { i, r -> LegHit(r.chunkId, i, r.rank) },
+            vector = vectorTimed.results.mapIndexed { i, r -> LegHit(r.chunkId, i, r.similarity) },
+            fused = fused.mapIndexed { i, (id, score) ->
+                val searchType = when {
+                    id in lexicalIdSet && id in vectorIdSet -> SearchType.BOTH
+                    id in vectorIdSet -> SearchType.EMBEDDING
+                    else -> SearchType.LEXICAL
+                }
+                FusedHit(id, score, i, searchType)
+            },
+            timingsMs = timings,
+            tsqueryText = tsqueryText,
+        )
     }
 
     /**
@@ -140,3 +199,18 @@ enum class SearchType {
     EMBEDDING,
     BOTH,
 }
+
+/** One candidate from a single retrieval leg, before fusion — [score] is `ts_rank_cd` for lexical, cosine similarity for vector. */
+data class LegHit(val chunkId: UUID, val position: Int, val score: Double)
+
+/** One entry in the post-fusion ranking, with the RRF score that produced its position. */
+data class FusedHit(val chunkId: UUID, val rrfScore: Double, val position: Int, val searchType: SearchType)
+
+/** Full output of [HybridSearchService.explain] — see its KDoc. */
+data class ExplainResult(
+    val lexical: List<LegHit>,
+    val vector: List<LegHit>,
+    val fused: List<FusedHit>,
+    val timingsMs: Map<String, Long>,
+    val tsqueryText: String,
+)

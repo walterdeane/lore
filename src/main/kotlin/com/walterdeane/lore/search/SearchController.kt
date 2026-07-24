@@ -30,7 +30,12 @@ class SearchController(
     ): ResponseEntity<LexicalSearchService.SearchPage> =
         ResponseEntity.ok(lexicalSearchService.search(q, domainId, tags, size, page))
 
-    /** Lexical + vector search fused with RRF — see [HybridSearchService]. */
+    /**
+     * Lexical + vector search fused with RRF — see [HybridSearchService]. `explain=true` switches
+     * to the post-03 capture harness ([HybridSearchService.explain]): per-leg candidate lists,
+     * fusion detail, and stage timings, instead of the normal fused [HybridSearchService.SearchPage].
+     * Dev/analysis use only — no UI reads this.
+     */
     @GetMapping("/hybrid")
     fun hybrid(
         @RequestParam q: String,
@@ -38,6 +43,11 @@ class SearchController(
         @RequestParam(required = false) tags: List<String>?,
         @RequestParam(defaultValue = "20") size: Int,
         @RequestParam(defaultValue = "0") page: Int,
-    ): ResponseEntity<HybridSearchService.SearchPage> =
-        ResponseEntity.ok(hybridSearchService.search(q, domainId, tags, size, page))
+        @RequestParam(defaultValue = "false") explain: Boolean,
+    ): ResponseEntity<Any> =
+        if (explain) {
+            ResponseEntity.ok(hybridSearchService.explain(q, domainId, tags))
+        } else {
+            ResponseEntity.ok(hybridSearchService.search(q, domainId, tags, size, page))
+        }
 }
