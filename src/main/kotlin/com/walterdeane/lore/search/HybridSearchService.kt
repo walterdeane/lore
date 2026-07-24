@@ -1,7 +1,9 @@
 package com.walterdeane.lore.search
 
 import com.walterdeane.lore.model.ChunkingStrategy
+import org.postgresql.util.PGobject
 import org.slf4j.LoggerFactory
+import org.springframework.ai.embedding.EmbeddingModel
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.PreparedStatementSetter
 import org.springframework.jdbc.core.RowMapper
@@ -33,6 +35,7 @@ class HybridSearchService(
     private val vectorSearchService: VectorSearchService,
     private val jdbcTemplate: JdbcTemplate,
     private val searchProperties: SearchProperties,
+    private val embeddingModel: EmbeddingModel,
 ) {
 
     private val log = LoggerFactory.getLogger(HybridSearchService::class.java)
@@ -72,25 +75,139 @@ class HybridSearchService(
     }
 
     /**
-     * Retrieves candidatePoolSize chunk ids from each of the lexical and vector search legs, fuses
-     * them into one ranked list via [fuse], then hydrates only the ids needed for the requested page
-     * with a single follow-up SQL query (avoids re-running both searches per page).
+     * Post-03 Phase 2.1: what used to be three round trips (lexical SQL, vector SQL, Kotlin [fuse],
+     * hydrate SQL) is now one statement — two CTEs ranking each leg's top [SearchProperties.candidatePoolSize]
+     * candidates by `ROW_NUMBER()`, a `FULL OUTER JOIN` computing the same RRF formula [fuse] uses
+     * (`1/(k+pos)` per leg, summed), and the chunk/document hydration columns joined in directly.
+     * Query embedding still happens in Kotlin ([EmbeddingModel.embed]) and is passed in as a
+     * parameter, same as [VectorSearchService] does standalone — that part isn't SQL and doesn't
+     * need to be. [LexicalSearchService]/[VectorSearchService]/[fuse]/[hydrate] are unchanged and
+     * still used by [explain], which deliberately keeps the legs visible for debugging/capture
+     * rather than adopting this single-statement path.
+     *
+     * Stage timing note: `lexical_sql`/`vector_sql`/`fuse`/`hydrate` (the four steps this replaces)
+     * collapse into one `hybrid_sql` stage; `vector_embed` is unchanged since embedding is still a
+     * separate Kotlin-side call. Comparing a before capture (four stages) against an after capture
+     * (`vector_embed` + `hybrid_sql`) means summing the four old stages against the one new one.
+     *
+     * Tie-break note: [fuse]'s scores can tie (verified against real data — same score, different
+     * chunks) whenever two candidates each rank #1 in exactly one leg and are absent from the other.
+     * The old code broke ties by `LinkedHashMap` insertion order (lexical scored before vector) —
+     * an accident of implementation, not a relevance signal (see post-03 capture notes on this
+     * exact behavior). SQL has no equivalent accident to inherit, so ties are broken explicitly by
+     * `c.id` instead: arbitrary, but deterministic and documented, which the old behavior wasn't.
      */
     fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage {
         val poolSize = searchProperties.candidatePoolSize
-        val lexicalIds = lexicalSearchService.search(query, domainId, tags, size = poolSize, page = 0).results.map { it.chunkId }
-        val vectorIds = vectorSearchService.search(query, domainId, tags, size = poolSize).map { it.chunkId }
+        val k = searchProperties.rrfK
 
-        val (fused, _) = timedStage(log, "fuse", query) { fuse(lexicalIds, vectorIds, searchProperties.rrfK) }
-        val total = fused.size.toLong()
-        val pageIds = fused.drop(page * size).take(size)
-        if (pageIds.isEmpty()) return SearchPage(emptyList(), total, page, size)
+        val (vectorParam, _) = timedStage(log, "vector_embed", query) { toVectorParam(query) }
+        val tagClause = tagFilterClause(tags)
 
-        val (hydrated, _) = timedStage(log, "hydrate", query) {
-            hydrate(pageIds.map { it.first }, query, lexicalIds.toSet(), vectorIds.toSet())
+        val sql = """
+            WITH ${candidateCtesSql(tagClause)}
+            SELECT c.id, c.document_id, c.domain_id, c.chunk_index, c.chunk_strategy, c.tag_paths,
+                   ts_headline('english', c.content, plainto_tsquery('english', ?), 'MaxWords=35, MinWords=15') AS headline,
+                   fused.rrf_score, fused.search_type,
+                   d.title AS document_title, d.author AS document_author,
+                   COUNT(*) OVER() AS total_count
+            FROM fused
+            JOIN chunk c ON c.id = fused.id
+            JOIN document d ON d.id = c.document_id
+            ORDER BY fused.rrf_score DESC, c.id
+            LIMIT ? OFFSET ?
+        """.trimIndent()
+
+        val args = candidateCteArgs(query, vectorParam, domainId, tags, poolSize, k) + listOf(query, size, page * size)
+
+        var total = 0L
+        val (results, _) = timedStage(log, "hybrid_sql", query) {
+            jdbcTemplate.query(sql, { rs, rowNum ->
+                if (rowNum == 0) total = rs.getLong("total_count")
+                Result(
+                    chunkId = rs.getObject("id", UUID::class.java),
+                    documentId = rs.getObject("document_id", UUID::class.java),
+                    domainId = rs.getObject("domain_id", UUID::class.java),
+                    chunkIndex = rs.getInt("chunk_index"),
+                    chunkStrategy = ChunkingStrategy.valueOf(rs.getString("chunk_strategy")),
+                    tagPaths = (rs.getArray("tag_paths").array as Array<*>).map { it.toString() },
+                    headline = rs.getString("headline"),
+                    rank = rs.getDouble("rrf_score"),
+                    documentTitle = rs.getString("document_title"),
+                    documentAuthor = rs.getString("document_author"),
+                    searchType = SearchType.valueOf(rs.getString("search_type")),
+                )
+            }, *args.toTypedArray())
         }
-        val results = pageIds.mapNotNull { (id, score) -> hydrated[id]?.copy(rank = score) }
+
+        // COUNT(*) OVER() rides on the returned rows, so a page past the end (LIMIT/OFFSET yields
+        // zero rows) leaves no row to read a total from — matches old behavior (fuse()'s full size
+        // was known before slicing to the page) via a direct count of the same CTEs, only when needed.
+        if (results.isEmpty()) {
+            total = countFused(query, vectorParam, domainId, tags, poolSize)
+        }
+
         return SearchPage(results, total, page, size)
+    }
+
+    private fun toVectorParam(query: String): PGobject = PGobject().apply {
+        type = "vector"
+        value = embeddingModel.embed(query).joinToString(",", "[", "]")
+    }
+
+    /** Shared `lex`/`vec` candidate-ranking CTEs for [search] and [countFused] — see [search]'s KDoc for the mechanism. */
+    private fun candidateCtesSql(tagClause: String): String = """
+        lex_ranked AS (
+            SELECT c.id, ROW_NUMBER() OVER (ORDER BY ts_rank_cd(c.search_vector, q) DESC) AS pos
+            FROM chunk c, plainto_tsquery('english', ?) q
+            WHERE c.search_vector @@ q
+              AND c.domain_id = ?
+              $tagClause
+        ),
+        lex AS (
+            SELECT id, pos FROM lex_ranked WHERE pos <= ?
+        ),
+        vec_ranked AS (
+            SELECT c.id, ROW_NUMBER() OVER (ORDER BY c.embedding <=> ? ASC) AS pos
+            FROM chunk c
+            WHERE c.domain_id = ?
+              AND c.embedding IS NOT NULL
+              $tagClause
+        ),
+        vec AS (
+            SELECT id, pos FROM vec_ranked WHERE pos <= ?
+        ),
+        fused AS (
+            SELECT COALESCE(lex.id, vec.id) AS id,
+                   COALESCE(1.0 / (? + lex.pos), 0) + COALESCE(1.0 / (? + vec.pos), 0) AS rrf_score,
+                   CASE
+                       WHEN lex.id IS NOT NULL AND vec.id IS NOT NULL THEN 'BOTH'
+                       WHEN vec.id IS NOT NULL THEN 'EMBEDDING'
+                       ELSE 'LEXICAL'
+                   END AS search_type
+            FROM lex
+            FULL OUTER JOIN vec ON lex.id = vec.id
+        )
+    """.trimIndent()
+
+    /** Positional args matching [candidateCtesSql]'s `?` placeholders, in order. */
+    private fun candidateCteArgs(query: String, vectorParam: PGobject, domainId: UUID, tags: List<String>?, poolSize: Int, k: Int): List<Any?> =
+        buildList {
+            add(query); add(domainId)
+            if (!tags.isNullOrEmpty()) addAll(tags)
+            add(poolSize)
+            add(vectorParam); add(domainId)
+            if (!tags.isNullOrEmpty()) addAll(tags)
+            add(poolSize)
+            add(k); add(k)
+        }
+
+    /** Fallback total when [search]'s main query returns zero rows (an out-of-range page) — see the comment at its call site. */
+    private fun countFused(query: String, vectorParam: PGobject, domainId: UUID, tags: List<String>?, poolSize: Int): Long {
+        val tagClause = tagFilterClause(tags)
+        val sql = "WITH ${candidateCtesSql(tagClause)} SELECT COUNT(*) FROM fused"
+        val args = candidateCteArgs(query, vectorParam, domainId, tags, poolSize, searchProperties.rrfK)
+        return jdbcTemplate.queryForObject(sql, Long::class.java, *args.toTypedArray()) ?: 0L
     }
 
     /**
