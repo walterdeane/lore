@@ -18,11 +18,12 @@ Passages:
 """
 
 /**
- * Extracts a passage ranking from the chat model's free-text response: every integer found, in
- * the order it appears, filtered to valid indices and de-duplicated. Pulled out as a pure function
- * so the parsing (the part most likely to need adjusting as different models respond differently)
- * is testable without a real chat model — the model isn't guaranteed to follow the "ONLY a JSON
- * array" instruction exactly, so this deliberately tolerates surrounding prose, not just strict JSON.
+ * Reads a passage ordering back out of the model's response text. The prompt asks for strict JSON
+ * (e.g. `[2,0,1]`), but models don't always follow instructions exactly, so rather than parsing
+ * JSON specifically, this just pulls out every number that appears anywhere in the response, in
+ * the order it appears, drops any number that isn't a valid passage index, and removes duplicates.
+ * Kept as its own plain function (no model call involved) so this parsing logic — the part most
+ * likely to need tweaking as different models respond differently — can be tested on its own.
  */
 internal fun parseRerankOrder(response: String, candidateCount: Int): List<Int> =
     Regex("\\d+").findAll(response)
@@ -32,9 +33,13 @@ internal fun parseRerankOrder(response: String, candidateCount: Int): List<Int> 
         .toList()
 
 /**
- * LLM-scored reranking: Ollama has no cross-encoder rerank endpoint, so relevance
- * ordering is done listwise by asking the chat model to rank numbered passages in a
- * single call. Falls back to the original order if the model's response can't be parsed.
+ * Re-orders a list of search results by asking an LLM to judge relevance directly, rather than
+ * relying only on the keyword/vector scores that found them in the first place. Some AI providers
+ * offer a model built specifically for this ("reranking"); Ollama, which this project uses, does
+ * not — so instead this shows the chat model all the candidate passages at once, numbered, and
+ * asks it to return them in relevance order. If the model's response can't be understood as an
+ * ordering (see [parseRerankOrder]), this falls back to the original order rather than failing the
+ * search outright.
  */
 @Service
 class RerankerService(chatClientBuilder: ChatClient.Builder) {
@@ -43,10 +48,11 @@ class RerankerService(chatClientBuilder: ChatClient.Builder) {
     private val chatClient = chatClientBuilder.build()
 
     /**
-     * Reranks [candidates] (typically the top-N fused hybrid-search hits) down to the best [topK]
-     * for feeding into the answering LLM's context window. Generic over T so both raw search
-     * results and already-hydrated chunks can be reranked; [contentOf] extracts the text to show
-     * the model. No-ops if there are already <= topK candidates.
+     * Narrows [candidates] (typically the results of a hybrid search) down to the best [topK], as
+     * judged by the LLM, so only the most relevant passages get passed along to whatever generates
+     * the final answer. Works with any type of candidate ([T]) — [contentOf] just needs to say how
+     * to get the text to show the model from each one. If there are already [topK] or fewer
+     * candidates, this does nothing and returns them unchanged.
      */
     fun <T> rerank(query: String, candidates: List<T>, topK: Int, contentOf: (T) -> String): List<T> {
         if (candidates.size <= topK) return candidates
@@ -63,9 +69,9 @@ class RerankerService(chatClientBuilder: ChatClient.Builder) {
 
         val order = parseRerankOrder(response, candidates.size)
         val fallbackTriggered = order.isEmpty()
-        // Post-03 observability (1.3): the raw response and parsed order are what actually needs
-        // debugging when a model doesn't follow the "ONLY a JSON array" instruction — logged verbatim
-        // rather than summarized, since a truncated/reformatted response would hide the failure mode.
+        // Logs the model's raw response and the parsed order, rather than a summary, because when
+        // the model doesn't follow the "ONLY a JSON array" instruction, the raw text is exactly
+        // what's needed to see what went wrong — a truncated or reformatted version would hide it.
         log.info(
             "rerank candidateCount={} topK={} ms={} fallbackTriggered={} parsedOrder={} rawResponse={}",
             candidates.size, topK, rerankMs, fallbackTriggered, order, response,

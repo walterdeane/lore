@@ -9,10 +9,13 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 
 /**
- * Semantic/"dense" retrieval: embeds the query with the same [EmbeddingModel] used at ingestion
- * time, then finds the nearest chunk embeddings in pgvector by cosine distance. Good at matching
- * meaning across different wording; blind to exact keyword/acronym matches, which is what
- * [LexicalSearchService] contributes in the hybrid pipeline.
+ * Meaning-based ("semantic") search over document chunks. When a chunk is first stored, it's
+ * converted into a vector — a list of numbers that captures its meaning — using an AI embedding
+ * model. This class converts the search query into a vector the same way (via the same
+ * [EmbeddingModel]), then uses the pgvector database extension to find the chunks whose stored
+ * vectors are closest to it. This finds matches based on meaning even when the wording is
+ * completely different, but has no notion of exact keyword/acronym matches — that's what
+ * [LexicalSearchService] contributes, and [HybridSearchService] combines the two.
  */
 @Service
 class VectorSearchService(
@@ -22,7 +25,7 @@ class VectorSearchService(
 
     private val log = LoggerFactory.getLogger(VectorSearchService::class.java)
 
-    /** [embedMs]/[sqlMs] are the post-03 instrumentation hook — [HybridSearchService.explain] surfaces them structurally. */
+    /** Same as a plain result list, but also reports how long each step took: [embedMs] for converting the query into a vector, [sqlMs] for the database search. Used by [HybridSearchService.explain] to show per-stage timing. */
     data class TimedResult(val results: List<Result>, val embedMs: Long, val sqlMs: Long)
 
     data class Result(
@@ -33,17 +36,21 @@ class VectorSearchService(
         val chunkStrategy: ChunkingStrategy,
         val tagPaths: List<String>,
         val headline: String,
-        // 1 - cosine distance; higher means more similar, matching the lexical leg's "higher rank is better" direction.
+        // How closely this chunk's meaning matches the query, from 0 (unrelated) to 1 (identical).
+        // Computed as 1 minus the vectors' cosine distance, so — like the keyword search's rank —
+        // a higher number always means a better match.
         val similarity: Double,
         val documentTitle: String,
         val documentAuthor: String?,
     )
 
     /**
-     * Embeds [query] at request time and runs a pgvector nearest-neighbor search (`<=>` cosine
-     * distance operator) against pre-computed chunk embeddings, scoped to [domainId] and optionally
-     * [tags]. Unlike [LexicalSearchService] this has no native highlighting, so the excerpt is just a
-     * plain truncation of the chunk content (see [plainExcerpt]).
+     * Converts [query] into a vector, then finds the chunks in [domainId] (optionally restricted
+     * to [tags]) whose stored vectors are the closest match, using Postgres's `<=>` operator to
+     * compute the distance between vectors. Unlike keyword search, there's no natural way to
+     * highlight "the matching words" here — a meaning-based match doesn't need to share any words
+     * with the query at all — so the excerpt returned is just the start of the chunk's text (see
+     * [plainExcerpt]).
      */
     fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20): List<Result> =
         searchTimed(query, domainId, tags, size).results
@@ -100,7 +107,7 @@ class VectorSearchService(
     }
 }
 
-/** Collapses whitespace and truncates to [maxLen] chars for a display excerpt (no query highlighting). */
+/** Builds a short display excerpt from [content]: collapses repeated whitespace and cuts it off at [maxLen] characters. Doesn't highlight anything, unlike the keyword-search excerpt. */
 internal fun plainExcerpt(content: String, maxLen: Int = 240): String {
     val stripped = content.trim().replace(Regex("\\s+"), " ")
     return if (stripped.length <= maxLen) stripped else stripped.take(maxLen).substringBeforeLast(' ') + "…"

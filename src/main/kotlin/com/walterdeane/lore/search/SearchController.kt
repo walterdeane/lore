@@ -8,9 +8,9 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 /**
- * JSON API exposing the two retrieval strategies directly (as opposed to [SearchViewController],
- * which renders HTML). Useful for comparing lexical-only vs. hybrid results side by side while
- * developing or demoing the retrieval pipeline.
+ * A JSON API for running searches directly (as opposed to [SearchViewController], which renders an
+ * HTML page). Useful for comparing keyword-only and combined ("hybrid") results side by side while
+ * developing or demoing search.
  */
 @RestController
 @RequestMapping("/api/search")
@@ -31,10 +31,10 @@ class SearchController(
         ResponseEntity.ok(lexicalSearchService.search(q, domainId, tags, size, page))
 
     /**
-     * Lexical + vector search fused with RRF — see [HybridSearchService]. `explain=true` switches
-     * to the post-03 capture harness ([HybridSearchService.explain]): per-leg candidate lists,
-     * fusion detail, and stage timings, instead of the normal fused [HybridSearchService.SearchPage].
-     * Dev/analysis use only — no UI reads this.
+     * Keyword and vector search combined via Reciprocal Rank Fusion — see [HybridSearchService].
+     * `explain=true` switches to the diagnostic version ([HybridSearchService.explain]): per-method
+     * candidate lists, fusion detail, and stage timings, instead of the normal combined
+     * [HybridSearchService.SearchPage]. Meant for development/debugging only — no UI reads this.
      */
     @GetMapping("/hybrid")
     fun hybrid(

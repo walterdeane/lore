@@ -3,10 +3,20 @@ package com.walterdeane.lore.search
 import org.springframework.boot.context.properties.ConfigurationProperties
 
 /**
- * `lexicalFallbackEnabled` (post-03 2.2): `plainto_tsquery`/`websearch_to_tsquery` AND every term,
- * so a natural-language question with one uncommon incidental word (e.g. "versus") can return zero
- * rows even though every other term is common — see `HybridSearchService`'s lexical-OR-fallback
- * doc. Default on; set false to reproduce the pre-2.2 AND-only behavior for comparison captures.
+ * Tuning knobs for search, set under `lore.search` in application config.
+ *
+ * - [candidatePoolSize]: how many top results each search method (keyword and semantic) considers
+ *   before the two are combined. A bigger pool gives a good match more chances to survive into the
+ *   final results, at the cost of a slower query.
+ * - [rrfK]: a smoothing constant used when combining the keyword and semantic rankings — see
+ *   [fuse]. Bigger values make the combined ranking less sensitive to small differences in
+ *   position between the two methods. 60 is a commonly used default.
+ * - [lexicalFallbackEnabled]: keyword search normally requires every significant word in the
+ *   query to appear in a matching chunk. That's strict enough that a natural-language question
+ *   like "what is the difference between cooking with gas versus charcoal" can match nothing at
+ *   all, just because of the word "versus" — even though every other word is common. When this is
+ *   on, a search that strictly matches nothing is retried requiring only one word to match instead
+ *   of all of them (see [shouldUseLexicalOrFallback]).
  */
 @ConfigurationProperties(prefix = "lore.search")
 data class SearchProperties(

@@ -7,10 +7,10 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 
 /**
- * Classic lexical/keyword search using Postgres full-text search (`tsvector`/`ts_rank_cd`).
- * This is the "sparse" retriever in the hybrid pipeline: strong on exact term/acronym matches,
- * weak on paraphrases and synonyms — [VectorSearchService] covers that gap, and
- * [HybridSearchService] merges the two.
+ * Keyword search over document chunks, using Postgres's built-in full-text search. Good at exact
+ * matches — names, acronyms, specific phrases — but it has no notion of meaning: searching "car"
+ * won't find a chunk that only says "automobile". [VectorSearchService] fills that gap with a
+ * meaning-based search, and [HybridSearchService] combines the two.
  */
 @Service
 class LexicalSearchService(
@@ -20,7 +20,7 @@ class LexicalSearchService(
 
     private val log = LoggerFactory.getLogger(LexicalSearchService::class.java)
 
-    /** [sqlMs] is the post-03 instrumentation hook — [HybridSearchService.explain] surfaces it structurally. */
+    /** Same as [SearchPage], but also reports how long the SQL query took ([sqlMs]) — used by [HybridSearchService.explain] to show per-stage timing. */
     data class TimedResult(val page: SearchPage, val sqlMs: Long)
 
     data class Result(
@@ -48,12 +48,13 @@ class LexicalSearchService(
     }
 
     /**
-     * Ranks chunks in [domainId] by Postgres's `ts_rank_cd` against a `websearch_to_tsquery` built
-     * from [query] — falling back to the same lexemes ORed together instead of ANDed when that
-     * finds nothing and [SearchProperties.lexicalFallbackEnabled] is on (post-03 2.2; see
-     * [shouldUseLexicalOrFallback]) — optionally restricted to chunks under [tags] (see
-     * [tagFilterClause]). Also returns a highlighted excerpt (`ts_headline`) so result lists can
-     * show why a chunk matched.
+     * Searches for [query] among the chunks belonging to [domainId], ranking each result by how
+     * well it matches the search terms (Postgres's `ts_rank_cd` function). By default this
+     * requires every significant word in [query] to appear in a matching chunk; if that finds
+     * nothing and [SearchProperties.lexicalFallbackEnabled] is on, it retries requiring only one
+     * word to match instead (see [shouldUseLexicalOrFallback]). Optionally restrict results to
+     * chunks under [tags] (see [tagFilterClause]). Each result also includes a highlighted excerpt
+     * of the matching text, so result lists can show *why* a chunk matched.
      */
     fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage =
         searchTimed(query, domainId, tags, size, page).page

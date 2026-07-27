@@ -3,10 +3,11 @@ package com.walterdeane.lore.search
 import org.slf4j.Logger
 
 /**
- * Times [block], logs one greppable line (`stage=<stage> query='<query>' ms=<elapsed>`) via [log],
- * and returns both the block's result and the elapsed milliseconds — post-03 instrumentation for
- * building a before/after latency picture across the retrieval/chat pipeline without a metrics
- * stack. Callers that only need the logging side effect can discard the second element.
+ * Runs [block], measures how long it took, and logs one line —
+ * `stage=<stage> query='<query>' ms=<elapsed>` — so anyone can search the logs for a given stage
+ * name (e.g. `vector_sql`) and see how long it's taking in practice. Returns both the block's
+ * result and the elapsed time in milliseconds; callers that only care about the log line can
+ * ignore the second value.
  */
 inline fun <T> timedStage(log: Logger, stage: String, query: String, block: () -> T): Pair<T, Long> {
     val start = System.nanoTime()

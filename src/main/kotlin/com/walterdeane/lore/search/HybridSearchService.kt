@@ -11,9 +11,14 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 
 /**
- * Combines two independently-ranked chunk-id lists via Reciprocal Rank Fusion:
- * score(chunk) = sum of 1/(k + rank) across whichever lists it appears in.
- * Pure function so it's unit-testable without a Spring context.
+ * Merges two separately-ranked lists of chunk IDs into one ranking, using a technique called
+ * Reciprocal Rank Fusion (RRF). Each chunk gets a score of `1 / (k + its position in the list)`
+ * for every list it appears in (position 0 scores highest); a chunk that appears in both lists has
+ * both scores added together. The returned list is sorted by that combined score, highest first.
+ * [k] is a smoothing constant — see [SearchProperties.rrfK].
+ *
+ * This is a plain function with no database or Spring dependency, so it can be unit-tested on its
+ * own, without needing a running application.
  */
 fun fuse(lexical: List<UUID>, vector: List<UUID>, k: Int = 60): List<Pair<UUID, Double>> {
     val scores = LinkedHashMap<UUID, Double>()
@@ -23,11 +28,17 @@ fun fuse(lexical: List<UUID>, vector: List<UUID>, k: Int = 60): List<Pair<UUID, 
 }
 
 /**
- * Orchestrates hybrid retrieval: run lexical (keyword) and vector (semantic) search independently,
- * then fuse their rankings with Reciprocal Rank Fusion so the result set benefits from both —
- * exact term matches the lexical leg is good at, and paraphrase/semantic matches vector search is
- * good at. This is the "R" (retrieval) half of RAG; [com.walterdeane.lore.chat.ChatViewController]
- * is the consumer that feeds these results into an LLM as grounding context.
+ * Runs a search two different ways and combines the results, so the outcome benefits from both:
+ *
+ * - Keyword search ([LexicalSearchService]) is good at exact matches — names, acronyms, specific
+ *   phrases.
+ * - Meaning-based/"semantic" search ([VectorSearchService]) is good at matching what a query
+ *   *means*, even when the wording is completely different.
+ *
+ * The two ranked lists are merged into one combined ranking using Reciprocal Rank Fusion — see
+ * [fuse]. That combined ranking is what other features use as the set of passages to show — for
+ * example, [com.walterdeane.lore.chat.ChatViewController] (the chat feature) feeds these results to
+ * an LLM as context so it can answer questions grounded in the user's own documents.
  */
 @Service
 class HybridSearchService(
@@ -48,20 +59,27 @@ class HybridSearchService(
         val chunkStrategy: ChunkingStrategy,
         val tagPaths: List<String>,
         val headline: String,
-        // Fused RRF score, not a lexical-leg rank — named `rank` so search/index.html needs no changes.
+        // The combined score computed by fusing the keyword and vector rankings together (see
+        // [fuse]) — not a raw position from either individual method. Still called `rank` (rather
+        // than `score`) so the search results page doesn't need any changes.
         val rank: Double,
         val documentTitle: String,
         val documentAuthor: String?,
-        // Which retrieval leg(s) surfaced this chunk for this query — not a stored chunk property
-        // (every chunk always has both a tsvector and an embedding), so it's derived at query time
-        // from membership in the two pre-fusion candidate lists. See [hydrate].
+        // Which search method actually found this chunk for this query: keyword, semantic, or
+        // both. This isn't about what's stored — every chunk always has both a full-text search
+        // entry and an embedding — it's computed at query time from which candidate list(s) this
+        // chunk showed up in before fusion. See [hydrate].
         val searchType: SearchType,
     )
 
     /**
-     * total/pagination are bounded by the fused candidate pool (<= 2 * candidatePoolSize, deduped),
-     * not an exhaustive count of the corpus — this is RAG-style top-K retrieval, not full search-engine
-     * pagination, so results won't grow past the pool no matter how deep you page.
+     * A page of search results, plus pagination info. Note that [total] isn't a count of every
+     * matching chunk across the whole document collection — it's the size of the combined
+     * candidate pool that keyword and semantic search produced (at most
+     * `2 * `[SearchProperties.candidatePoolSize], after removing duplicates). This search is meant
+     * to find the best handful of passages for an LLM to use as context, not to behave like a
+     * general-purpose search engine, so paging deep into the results won't ever surface more than
+     * that pool contains.
      */
     data class SearchPage(
         val results: List<Result>,
@@ -75,27 +93,34 @@ class HybridSearchService(
     }
 
     /**
-     * Post-03 Phase 2.1: what used to be three round trips (lexical SQL, vector SQL, Kotlin [fuse],
-     * hydrate SQL) is now one statement — two CTEs ranking each leg's top [SearchProperties.candidatePoolSize]
-     * candidates by `ROW_NUMBER()`, a `FULL OUTER JOIN` computing the same RRF formula [fuse] uses
-     * (`1/(k+pos)` per leg, summed), and the chunk/document hydration columns joined in directly.
-     * Query embedding still happens in Kotlin ([EmbeddingModel.embed]) and is passed in as a
-     * parameter, same as [VectorSearchService] does standalone — that part isn't SQL and doesn't
-     * need to be. [LexicalSearchService]/[VectorSearchService]/[fuse]/[hydrate] are unchanged and
-     * still used by [explain], which deliberately keeps the legs visible for debugging/capture
-     * rather than adopting this single-statement path.
+     * Runs a hybrid search: looks up [query] both by keyword and by meaning, combines the two
+     * rankings with Reciprocal Rank Fusion, and returns one page of the combined, de-duplicated
+     * results — each with its chunk text, its document, and which method(s) found it.
      *
-     * Stage timing note: `lexical_sql`/`vector_sql`/`fuse`/`hydrate` (the four steps this replaces)
-     * collapse into one `hybrid_sql` stage; `vector_embed` is unchanged since embedding is still a
-     * separate Kotlin-side call. Comparing a before capture (four stages) against an after capture
-     * (`vector_embed` + `hybrid_sql`) means summing the four old stages against the one new one.
+     * This all happens in a single SQL query. In plain terms, that query:
+     * 1. Ranks the top [SearchProperties.candidatePoolSize] chunks by keyword match.
+     * 2. Separately ranks the top [SearchProperties.candidatePoolSize] chunks by how close their
+     *    stored vector is to the query's vector.
+     * 3. Combines those two ranked lists (a chunk found by only one method still appears once),
+     *    computing the same Reciprocal Rank Fusion score that [fuse] computes — `1/(k + position)`
+     *    from each list, added together for any chunk that appears in both.
+     * 4. Joins in the chunk text and document details needed to display each result, sorts by the
+     *    combined score, and returns one page of it.
      *
-     * Tie-break note: [fuse]'s scores can tie (verified against real data — same score, different
-     * chunks) whenever two candidates each rank #1 in exactly one leg and are absent from the other.
-     * The old code broke ties by `LinkedHashMap` insertion order (lexical scored before vector) —
-     * an accident of implementation, not a relevance signal (see post-03 capture notes on this
-     * exact behavior). SQL has no equivalent accident to inherit, so ties are broken explicitly by
-     * `c.id` instead: arbitrary, but deterministic and documented, which the old behavior wasn't.
+     * Turning the query into a vector still has to happen in Kotlin first (via
+     * [EmbeddingModel.embed], the same call [VectorSearchService] makes on its own) — that step
+     * isn't something SQL can do — and the resulting vector is passed into the query as a
+     * parameter.
+     *
+     * [LexicalSearchService], [VectorSearchService], and [fuse] are separate, reusable pieces that
+     * this method doesn't call directly, since it does the equivalent work in one query instead.
+     * [explain] uses those separate pieces rather than this method, specifically so each stage's
+     * inputs and outputs stay visible for debugging.
+     *
+     * One detail worth knowing: two chunks can end up with exactly the same combined score — for
+     * example, two chunks that each rank #1 in one method's list but don't appear in the other's
+     * list at all. When that happens, this method breaks the tie by chunk ID, which is an arbitrary
+     * choice but gives a consistent order from one run to the next.
      */
     fun search(query: String, domainId: UUID, tags: List<String>? = null, size: Int = 20, page: Int = 0): SearchPage {
         val poolSize = searchProperties.candidatePoolSize
@@ -143,9 +168,10 @@ class HybridSearchService(
             }, *args.toTypedArray())
         }
 
-        // COUNT(*) OVER() rides on the returned rows, so a page past the end (LIMIT/OFFSET yields
-        // zero rows) leaves no row to read a total from — matches old behavior (fuse()'s full size
-        // was known before slicing to the page) via a direct count of the same CTEs, only when needed.
+        // The total result count above rides along with each returned row (a SQL trick:
+        // COUNT(*) OVER()). That breaks down if the requested page is past the end of the
+        // results — then there are no rows at all to read a total from — so in that case, run a
+        // separate query just to get the count.
         if (results.isEmpty()) {
             total = countFused(query, vectorParam, domainId, tags, poolSize, tsqueryFromItem)
         }
@@ -158,7 +184,12 @@ class HybridSearchService(
         value = embeddingModel.embed(query).joinToString(",", "[", "]")
     }
 
-    /** Shared `lex`/`vec` candidate-ranking CTEs for [search] and [countFused] — see [search]'s KDoc for the mechanism. */
+    /**
+     * The reusable SQL building blocks — Postgres calls these "CTEs" (`WITH ... AS (...)`), named
+     * temporary result sets you can query like tables within one larger query — that rank and
+     * combine the keyword and vector candidates. Shared by [search] and [countFused] so the two
+     * stay in sync. See [search]'s comment for what each step does.
+     */
     private fun candidateCtesSql(tagClause: String, tsqueryFromItem: String): String = """
         lex_ranked AS (
             SELECT c.id, ROW_NUMBER() OVER (ORDER BY ts_rank_cd(c.search_vector, q.q) DESC) AS pos
@@ -193,7 +224,7 @@ class HybridSearchService(
         )
     """.trimIndent()
 
-    /** Positional args matching [candidateCtesSql]'s `?` placeholders, in order. */
+    /** The parameter values to fill in [candidateCtesSql]'s `?` placeholders, in the same order they appear in the SQL. */
     private fun candidateCteArgs(query: String, vectorParam: PGobject, domainId: UUID, tags: List<String>?, poolSize: Int, k: Int): List<Any?> =
         buildList {
             add(query); add(domainId)
@@ -205,7 +236,7 @@ class HybridSearchService(
             add(k); add(k)
         }
 
-    /** Fallback total when [search]'s main query returns zero rows (an out-of-range page) — see the comment at its call site. */
+    /** Counts how many chunks are in the combined candidate pool — used as a fallback when [search]'s main query returns no rows to read a total from (see the comment at its call site). */
     private fun countFused(query: String, vectorParam: PGobject, domainId: UUID, tags: List<String>?, poolSize: Int, tsqueryFromItem: String): Long {
         val tagClause = tagFilterClause(tags)
         val sql = "WITH ${candidateCtesSql(tagClause, tsqueryFromItem)} SELECT COUNT(*) FROM fused"
@@ -214,17 +245,18 @@ class HybridSearchService(
     }
 
     /**
-     * The post-03 capture harness (`post-03-data-capture-spec.md`): returns per-leg candidate lists
-     * with positions/scores, the fused list, per-stage timings, and the resolved tsquery text for
-     * [query] — everything [search] computes and discards, made visible instead of hidden behind
-     * one fused [SearchPage]. Deliberately a separate method rather than a flag on [search] so the
-     * normal path's return type/behavior can't drift by accident.
+     * A diagnostic version of [search] for developers: instead of returning only the final combined
+     * results, this exposes every intermediate step — the keyword-only results, the vector-only
+     * results, the combined ranking, how long each stage took, and the exact full-text search
+     * pattern that was used. It's meant for understanding *why* a particular chunk did or didn't
+     * show up — for example, whether it was found by keyword search, vector search, or both.
      *
-     * [ExplainResult.tsqueryText] reflects Phase 2.2: whatever [search] would actually run —
-     * `websearch_to_tsquery`, or the OR-fallback form when the AND form finds nothing and
-     * [SearchProperties.lexicalFallbackEnabled] is on — not the plain `plainto_tsquery` output. A
-     * capture wanting to see *why* the fallback triggered can diff this against
-     * `websearch_to_tsquery('english', ?)::text` directly.
+     * This is a separate method rather than a flag on [search], so that [search]'s normal, simpler
+     * return type can't accidentally change just to support this debugging path.
+     *
+     * [ExplainResult.tsqueryText] is the actual full-text search pattern used for the query,
+     * including whether the "match any word" fallback kicked in (see
+     * [SearchProperties.lexicalFallbackEnabled]).
      */
     fun explain(query: String, domainId: UUID, tags: List<String>? = null): ExplainResult {
         val poolSize = searchProperties.candidatePoolSize
@@ -275,9 +307,11 @@ class HybridSearchService(
     }
 
     /**
-     * Loads chunk/document metadata plus a query-highlighted headline for the given fused-result ids.
-     * [lexicalIds]/[vectorIds] are the pre-fusion candidate sets, used only to classify each result's
-     * [Result.searchType] — a chunk in both is where RRF's fusion actually pays off.
+     * Looks up the full details — document title/author, chunk text, a highlighted excerpt — for a
+     * list of chunk IDs that have already gone through fusion. [lexicalIds] and [vectorIds] are the
+     * pre-fusion candidate sets, passed in only so each result can be labeled with
+     * [Result.searchType]: a chunk found by both methods is exactly the case Reciprocal Rank Fusion
+     * is designed to reward.
      */
     private fun hydrate(ids: List<UUID>, query: String, lexicalIds: Set<UUID>, vectorIds: Set<UUID>): Map<UUID, Result> {
         val sql = """
@@ -320,17 +354,17 @@ class HybridSearchService(
     }
 }
 
-/** Which retrieval leg(s) surfaced a result: keyword search, semantic search, or both (the case RRF rewards). */
+/** Which search method found a given result: keyword search, semantic search, or both (finding a result both ways is the case Reciprocal Rank Fusion rewards most). */
 enum class SearchType {
     LEXICAL,
     EMBEDDING,
     BOTH,
 }
 
-/** One candidate from a single retrieval leg, before fusion — [score] is `ts_rank_cd` for lexical, cosine similarity for vector. */
+/** One candidate from a single search method, before combining with the other. [score] is the keyword-match score (Postgres's `ts_rank_cd`) for keyword search, or similarity for vector search. */
 data class LegHit(val chunkId: UUID, val position: Int, val score: Double)
 
-/** One entry in the post-fusion ranking, with the RRF score that produced its position. */
+/** One entry in the combined ranking, with the score (from [fuse]) that determined its position. */
 data class FusedHit(val chunkId: UUID, val rrfScore: Double, val position: Int, val searchType: SearchType)
 
 /** Full output of [HybridSearchService.explain] — see its KDoc. */

@@ -14,9 +14,9 @@ import org.springframework.web.bind.annotation.RequestParam
 import java.util.UUID
 
 /**
- * Human-facing search UI: renders the retrieval side of the RAG pipeline on its own, without an
- * LLM in the loop, so you can inspect what hybrid search actually returns before it gets fed to
- * the chat model in [com.walterdeane.lore.chat.ChatViewController].
+ * The human-facing search page. Runs [HybridSearchService] and displays its results directly, with
+ * no LLM involved, so you can see exactly what search finds before those same results get fed to
+ * an LLM as context in the chat feature ([com.walterdeane.lore.chat.ChatViewController]).
  */
 @Controller
 @RequestMapping("/search")
